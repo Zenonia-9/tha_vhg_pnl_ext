@@ -113,15 +113,30 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if not current_column_group_key:
             return
 
-        options["vhg_actual_percent_column_group_key"] = current_column_group_key
+        actual_percent_column_group_key = "vhg_actual_percent"
+        options["vhg_actual_percent_balance_column_group_key"] = current_column_group_key
+        options["vhg_actual_percent_column_group_key"] = actual_percent_column_group_key
         if any(column["expression_label"] == "actual_percent" for column in options["columns"]):
             return
+
+        column_groups = {}
+        for column_group_key, column_group in options["column_groups"].items():
+            if column_group_key == current_column_group_key:
+                column_groups[actual_percent_column_group_key] = {
+                    "forced_options": {
+                        "date": dict(options["date"]),
+                        "vhg_actual_percent": True,
+                    },
+                    "forced_domain": [],
+                }
+            column_groups[column_group_key] = column_group
+        options["column_groups"] = column_groups
 
         for index, column in enumerate(options["columns"]):
             if column["column_group_key"] == current_column_group_key and column["expression_label"] == "balance":
                 options["columns"].insert(index, {
-                    "name": "",
-                    "column_group_key": current_column_group_key,
+                    "name": "%",
+                    "column_group_key": actual_percent_column_group_key,
                     "expression_label": "actual_percent",
                     "sortable": False,
                     "figure_type": "percentage",
@@ -154,6 +169,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         companies = self.env["res.company"]
 
         for column_group_key, column_options in report._split_options_per_column_group(options).items():
+            if column_group_key == options.get("vhg_actual_percent_column_group_key"):
+                continue
             query = report._get_report_query(column_options, "strict_range", domain=pnl_domain)
             self.env.cr.execute(SQL(
                 """
@@ -218,7 +235,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         return columns
 
     def _actual_percent(self, options, group_key, balances, group_balances):
-        current_column_group_key = options.get("vhg_actual_percent_column_group_key")
+        current_column_group_key = options.get("vhg_actual_percent_balance_column_group_key")
         if not current_column_group_key:
             return None
 
