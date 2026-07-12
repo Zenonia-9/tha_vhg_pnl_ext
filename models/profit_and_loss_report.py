@@ -120,7 +120,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         for index, column in enumerate(options["columns"]):
             if column["column_group_key"] == current_column_group_key and column["expression_label"] == "balance":
                 options["columns"].insert(index, {
-                    "name": "Actual %",
+                    "name": "",
                     "column_group_key": current_column_group_key,
                     "expression_label": "actual_percent",
                     "sortable": False,
@@ -130,10 +130,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 })
                 break
 
-        for header in options["column_headers"][0]:
+        for index, header in enumerate(options["column_headers"][0]):
             header_date = header.get("forced_options", {}).get("date", {})
             if header_date.get("date_from") == options["date"]["date_from"] and header_date.get("date_to") == options["date"]["date_to"]:
-                header["colspan"] = header.get("colspan", 1) + 1
+                options["column_headers"][0].insert(index, {"name": "Actual %"})
                 break
 
     def _query_group_balances(self, report, options):
