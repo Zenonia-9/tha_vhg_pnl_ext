@@ -24,8 +24,16 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         ("inpatient", "Inpatient (Revenue)", -1, (
             "500095", "500100", "500150", "500115", "500135",
         )),
-        ("direct_cost", "Direct Cost (Doctor Fee + Refer + Reading)", 1, (
-            "600020", "600010",
+        ("additional_revenue", "Additional Revenue", -1, (
+            "500090", "500105", "500110", "500120", "500140", "500155",
+            "500160", "500165", "500170", "500175", "500180", "500185",
+            "500186", "500187", "500400", "500405", "500410", "500415",
+            "500420", "500425", "500600", "510020", "510025",
+        )),
+        ("direct_cost", "Direct Cost", 1, (
+            "600010", "600020", "600030", "600035", "600040", "600045",
+            "600180", "600181", "600182", "600183", "600184", "600185",
+            "600186", "600225",
         )),
         ("other_hospital_revenue", "Other Hospital Revenue (Partnership Income) By F&A", -1, (
             "510030", "510015", "510000", "510010", "510035",
@@ -37,6 +45,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         ("rental_complex", "Rental Complex Building & BIS By F&A", -1, (
             "510085", "510095", "510125", "510130",
         )),
+        ("other_income", "Other Income", -1, (
+            "510100", "510105", "510110", "510115", "510120", "510505",
+            "510550", "510560", "510570", "510580", "510585",
+        )),
         ("cost_of_goods_sold", "Cost of Goods Sold", 1, (
             "600050", "600060", "600070", "600080", "600090", "600100",
             "600110", "600120", "600130", "600140", "600150", "600170",
@@ -46,12 +58,13 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "700010", "700020", "700030", "700040", "700050", "700060",
             "700080", "700090", "700100", "700110", "700120", "700130",
             "700140", "700170", "700180", "700190", "700070", "700150",
-            "700160", "700200", "700210", "700220", "702311",
+            "700160", "700200", "700210", "700220", "700225", "702311",
         )),
         ("staff_cost", "Staff Cost (Based on Head Count)", 1, (
             "701010", "701030", "701040", "701050", "701060", "701070",
             "701080", "701090", "701100", "701110", "701120", "701130",
-            "701140", "701170", "701171", "701172", "703060",
+            "701140", "701150", "701160", "701170", "701171", "701172",
+            "701173", "701175", "703060",
         )),
         ("bonus", "Bonus", 1, ("701020",)),
         ("administrative", "Administrative & Other Expenses", 1, (
@@ -60,22 +73,26 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "702130", "702140", "702150", "702160", "702170", "702180",
             "702190", "702200", "702210", "702220", "702230", "702240",
             "702250", "702260", "702270", "702280", "702290", "702300",
-            "702310", "707030",
+            "702310", "702315", "702316", "707020", "707030",
         )),
         ("repair_maintenance", "Repair & Maintenance", 1, (
             "703010", "703020", "703030", "703040", "703050", "703070",
-            "703080",
+            "703080", "703085",
         )),
         ("sales_marketing", "Sales & Marketing", 1, (
-            "704010", "704020", "704030", "704040", "704050",
+            "704010", "704020", "704030", "704040", "704050", "704055",
         )),
         ("depreciation", "Depreciation & Amortization", 1, (
             "705010", "705020", "705030", "705040", "705050", "705060",
             "705070", "705080", "705090", "705100", "705110", "705120",
             "705130", "705140", "705150", "705160", "705170", "705180",
+            "705111", "705185",
         )),
         ("interest_income", "Interest Income", -1, ("500750",)),
-        ("finance_expenses", "Finance Expenses", 1, ("706080",)),
+        ("finance_expenses", "Finance Expenses", 1, (
+            "706010", "706020", "706030", "706040", "706050", "706060",
+            "706070", "706080",
+        )),
         ("income_tax", "Income Tax", 1, ("707010",)),
     )
 
@@ -88,13 +105,16 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         "outpatient": ("outpatient", "eopd_day_care"),
         "eopd_day_care": ("outpatient", "eopd_day_care"),
         "other_hospital_revenue": (
-            "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
+            "other_hospital_revenue", "non_hospital_revenue", "rental_complex", "other_income",
         ),
         "non_hospital_revenue": (
-            "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
+            "other_hospital_revenue", "non_hospital_revenue", "rental_complex", "other_income",
         ),
         "rental_complex": (
-            "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
+            "other_hospital_revenue", "non_hospital_revenue", "rental_complex", "other_income",
+        ),
+        "other_income": (
+            "other_hospital_revenue", "non_hospital_revenue", "rental_complex", "other_income",
         ),
         "staff_cost": ("staff_cost", "bonus"),
         "bonus": ("staff_cost", "bonus"),
@@ -348,31 +368,31 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             parent = self._group_line(report, options, key, name, group_balances[key])
             lines.append((0, parent))
 
-        for key in ("outpatient", "eopd_day_care", "inpatient"):
+        for key in ("outpatient", "eopd_day_care", "inpatient", "additional_revenue"):
             add_group(key)
 
         total_revenue = self._combine(
             group_balances,
-            additions=("outpatient", "eopd_day_care", "inpatient"),
+            additions=("outpatient", "eopd_day_care", "inpatient", "additional_revenue"),
         )
         lines.append((0, self._total_line(report, options, "total_revenue", "Total Revenue", total_revenue)))
 
         add_group("direct_cost")
         net_revenues = self._combine(
             group_balances,
-            additions=("outpatient", "eopd_day_care", "inpatient"),
+            additions=("outpatient", "eopd_day_care", "inpatient", "additional_revenue"),
             deductions=("direct_cost",),
         )
         lines.append((0, self._total_line(report, options, "net_revenues", "Net Revenues", net_revenues)))
 
-        for key in ("other_hospital_revenue", "non_hospital_revenue", "rental_complex"):
+        for key in ("other_hospital_revenue", "non_hospital_revenue", "rental_complex", "other_income"):
             add_group(key)
 
         net_operating_revenue = self._combine(
             group_balances,
             additions=(
-                "outpatient", "eopd_day_care", "inpatient",
-                "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
+                "outpatient", "eopd_day_care", "inpatient", "additional_revenue",
+                "other_hospital_revenue", "non_hospital_revenue", "rental_complex", "other_income",
             ),
             deductions=("direct_cost",),
         )
