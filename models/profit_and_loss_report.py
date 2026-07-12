@@ -84,6 +84,58 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         "administrative", "repair_maintenance", "sales_marketing",
     )
 
+    _SHARED_PERCENTAGE_GROUPS = {
+        "outpatient": ("outpatient", "eopd_day_care"),
+        "eopd_day_care": ("outpatient", "eopd_day_care"),
+        "other_hospital_revenue": (
+            "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
+        ),
+        "non_hospital_revenue": (
+            "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
+        ),
+        "rental_complex": (
+            "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
+        ),
+        "staff_cost": ("staff_cost", "bonus"),
+        "bonus": ("staff_cost", "bonus"),
+    }
+
+    def _custom_options_initializer(self, report, options, previous_options):
+        current_column_group_key = next(
+            (
+                column_group_key
+                for column_group_key, column_group in options["column_groups"].items()
+                if column_group.get("forced_options", {}).get("date", {}).get("date_from") == options["date"]["date_from"]
+                and column_group.get("forced_options", {}).get("date", {}).get("date_to") == options["date"]["date_to"]
+            ),
+            None,
+        )
+        if not current_column_group_key:
+            return
+
+        options["vhg_actual_percent_column_group_key"] = current_column_group_key
+        if any(column["expression_label"] == "actual_percent" for column in options["columns"]):
+            return
+
+        for index, column in enumerate(options["columns"]):
+            if column["column_group_key"] == current_column_group_key and column["expression_label"] == "balance":
+                options["columns"].insert(index, {
+                    "name": "Actual %",
+                    "column_group_key": current_column_group_key,
+                    "expression_label": "actual_percent",
+                    "sortable": False,
+                    "figure_type": "percentage",
+                    "blank_if_zero": False,
+                    "style": "text-align: center; white-space: nowrap;",
+                })
+                break
+
+        for header in options["column_headers"][0]:
+            header_date = header.get("forced_options", {}).get("date", {})
+            if header_date.get("date_from") == options["date"]["date_from"] and header_date.get("date_to") == options["date"]["date_to"]:
+                header["colspan"] = header.get("colspan", 1) + 1
+                break
+
     def _query_group_balances(self, report, options):
         code_to_group = {
             code: (key, sign)
@@ -153,15 +205,32 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 result[column_group_key] -= value
         return result
 
-    def _columns(self, report, options, balances):
-        return [
-            report._build_column_dict(
-                balances.get(column["column_group_key"], 0.0),
+    def _columns(self, report, options, balances, actual_percent=None):
+        columns = []
+        for column in options["columns"]:
+            is_actual_percent = column["expression_label"] == "actual_percent"
+            columns.append(report._build_column_dict(
+                actual_percent if is_actual_percent else balances.get(column["column_group_key"], 0.0),
                 column,
                 options=options,
-            )
-            for column in options["columns"]
-        ]
+                digits=2 if is_actual_percent else 1,
+            ))
+        return columns
+
+    def _actual_percent(self, options, group_key, balances, group_balances):
+        current_column_group_key = options.get("vhg_actual_percent_column_group_key")
+        if not current_column_group_key:
+            return None
+
+        denominator_groups = self._SHARED_PERCENTAGE_GROUPS.get(group_key, (group_key,))
+        denominator = sum(
+            group_balances[denominator_group][current_column_group_key]
+            for denominator_group in denominator_groups
+        )
+        if not denominator:
+            return None
+
+        return balances.get(current_column_group_key, 0.0) * 100.0 / denominator
 
     def _group_line(self, report, options, key, name, balances):
         line_id = report._get_generic_line_id(None, None, markup=f"vhg_pnl_{key}")
@@ -177,7 +246,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "expand_function": "_report_expand_unfoldable_line_vhg_pnl_group",
         }
 
-    def _account_line(self, report, options, parent_id, group_key, detail):
+    def _account_line(self, report, options, parent_id, group_key, detail, group_balances):
         line_id = report._get_generic_line_id(
             "account.account",
             detail["account_id"],
@@ -189,7 +258,12 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "name": f"{detail['code']} {detail['name']}".strip(),
             "level": 2,
             "parent_id": parent_id,
-            "columns": self._columns(report, options, detail["balances"]),
+            "columns": self._columns(
+                report,
+                options,
+                detail["balances"],
+                actual_percent=self._actual_percent(options, group_key, detail["balances"], group_balances),
+            ),
             "caret_options": "account.account",
         }
 
@@ -228,16 +302,17 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             return {"lines": [], "offset_increment": 0, "has_more": False}
 
         if unfold_all_batch_data:
+            group_balances = unfold_all_batch_data["group_balances"]
             account_balances = unfold_all_batch_data["account_balances"]
         else:
-            _group_balances, account_balances = self._query_group_balances(report, options)
+            group_balances, account_balances = self._query_group_balances(report, options)
 
         details = sorted(
             account_balances[group_key].values(),
             key=lambda detail: (detail["code"], detail["name"]),
         )
         lines = [
-            self._account_line(report, options, line_dict_id, group_key, detail)
+            self._account_line(report, options, line_dict_id, group_key, detail, group_balances)
             for detail in details
         ]
         return {
