@@ -174,6 +174,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "columns": self._columns(report, options, balances),
             "unfoldable": True,
             "unfolded": bool(unfolded),
+            "expand_function": "_report_expand_unfoldable_line_vhg_pnl_group",
         }
 
     def _account_line(self, report, options, parent_id, group_key, detail):
@@ -202,8 +203,51 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "unfoldable": False,
         }
 
-    def _dynamic_lines_generator(self, report, options, all_column_groups_expression_totals, warnings=None):
+    def _custom_unfold_all_batch_data_generator(self, report, options, lines_to_expand_by_function):
         group_balances, account_balances = self._query_group_balances(report, options)
+        return {
+            "group_balances": group_balances,
+            "account_balances": account_balances,
+        }
+
+    def _report_expand_unfoldable_line_vhg_pnl_group(
+        self,
+        line_dict_id,
+        groupby,
+        options,
+        progress,
+        offset,
+        unfold_all_batch_data=None,
+    ):
+        report = self.env["account.report"].browse(options["report_id"])
+        markup, model, _record_id = report._parse_line_id(line_dict_id)[-1]
+        prefix = "vhg_pnl_"
+        group_key = markup.removeprefix(prefix) if not model and isinstance(markup, str) else None
+        valid_group_keys = {key for key, _name, _sign, _codes in self._GROUPS}
+        if group_key not in valid_group_keys:
+            return {"lines": [], "offset_increment": 0, "has_more": False}
+
+        if unfold_all_batch_data:
+            account_balances = unfold_all_batch_data["account_balances"]
+        else:
+            _group_balances, account_balances = self._query_group_balances(report, options)
+
+        details = sorted(
+            account_balances[group_key].values(),
+            key=lambda detail: (detail["code"], detail["name"]),
+        )
+        lines = [
+            self._account_line(report, options, line_dict_id, group_key, detail)
+            for detail in details
+        ]
+        return {
+            "lines": lines,
+            "offset_increment": len(lines),
+            "has_more": False,
+        }
+
+    def _dynamic_lines_generator(self, report, options, all_column_groups_expression_totals, warnings=None):
+        group_balances, _account_balances = self._query_group_balances(report, options)
         group_meta = {key: (name, codes) for key, name, _sign, codes in self._GROUPS}
         lines = []
 
@@ -211,13 +255,6 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             name, _codes = group_meta[key]
             parent = self._group_line(report, options, key, name, group_balances[key])
             lines.append((0, parent))
-            if parent["unfolded"]:
-                details = sorted(
-                    account_balances[key].values(),
-                    key=lambda detail: (detail["code"], detail["name"]),
-                )
-                for detail in details:
-                    lines.append((0, self._account_line(report, options, parent["id"], key, detail)))
 
         for key in ("outpatient", "eopd_day_care", "inpatient"):
             add_group(key)
