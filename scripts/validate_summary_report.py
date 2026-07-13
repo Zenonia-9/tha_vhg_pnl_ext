@@ -26,6 +26,8 @@ assert [column["name"] for column in no_budget_options["columns"][:9]] == [
 assert len(no_budget_lines) == 26, len(no_budget_lines)
 assert all(not line.get("unfoldable") for line in no_budget_lines)
 assert all(not line.get("expand_function") for line in no_budget_lines)
+number_cells = [line["columns"][6]["no_format"] for line in no_budget_lines]
+assert [number for number in number_cells if number] == [str(number) for number in range(1, 18)]
 assert not no_budget_options["filters"]["show_period_comparison"]
 assert not no_budget_options["filters"]["show_all"]
 assert no_budget_options["vhg_summary_ytd_month_keys"] == [

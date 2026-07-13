@@ -15,25 +15,6 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     _description = "VHG Management Profit and Loss Summary Handler"
 
     _DEMO_BUDGET_NAME = "VHG Summary Demo Budget FY2026-27"
-    _SEQUENCES = {
-        "inpatient": "1",
-        "outpatient": "2",
-        "eopd_day_care": "3",
-        "direct_cost": "4",
-        "cost_of_goods_sold": "5",
-        "operating_cost": "6",
-        "staff_cost": "7",
-        "bonus": "7.1",
-        "administrative": "8",
-        "repair_maintenance": "9",
-        "sales_marketing": "10",
-        "other_hospital_revenue": "11",
-        "non_hospital_revenue": "12",
-        "depreciation": "13",
-        "financial_net": "14",
-        "rental_complex": "15",
-        "income_tax": "16",
-    }
     _REVENUE_GROUPS = ("inpatient", "outpatient", "eopd_day_care")
     _OTHER_REVENUE_GROUPS = (
         "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
@@ -305,20 +286,34 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "total_revenue", "net_revenues", "other_revenue", "total_net_revenues",
             "total_expenses", "ebitda", "ebit", "earnings_before_tax", "earnings_after_tax",
         }
-        return [
-            (0, {
+        group_keys = {
+            *self._REVENUE_GROUPS,
+            "direct_cost",
+            *self._OTHER_REVENUE_GROUPS,
+            *self._OPERATING_EXPENSE_GROUPS,
+            "depreciation",
+            "financial_net",
+            "income_tax",
+        }
+        group_number = 0
+        lines = []
+        for key, name in rows:
+            sequence = ""
+            if key in group_keys:
+                group_number += 1
+                sequence = str(group_number)
+            lines.append((0, {
                 "id": report._get_generic_line_id(None, None, markup=f"vhg_pnl_summary_{key}"),
                 "name": name,
                 "level": 0 if key in total_keys else 1,
                 "class": "fw-bold" if key in total_keys else "",
                 "columns": self._line_columns(
-                    report, options, key, values, self._SEQUENCES.get(key, "")
+                    report, options, key, values, sequence
                 ),
                 "unfoldable": False,
                 "unfolded": False,
-            })
-            for key, name in rows
-        ]
+            }))
+        return lines
 
     def seed_demo_budget(self):
         company = self.env["res.company"].search([

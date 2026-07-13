@@ -1,4 +1,4 @@
-.o_account_reports_page.o_vhg_pnl_summary {
+.o_action.account_report.o_vhg_pnl_summary {
     .o_account_reports_table {
         min-width: max-content;
     }
@@ -9,14 +9,17 @@
     }
 
     tr[data-id="column_headers_row"] th {
-        border-bottom: 1px solid var(--border-color, #45495a);
+        border: 1px solid var(--border-color, #45495a) !important;
         font-weight: 700;
-        text-align: center;
+        text-align: center !important;
+        vertical-align: middle;
     }
 
     tr[data-id="column_subheaders_row"] th {
+        border: 1px solid var(--border-color, #45495a) !important;
         font-weight: 600;
-        text-align: center;
+        text-align: center !important;
+        vertical-align: middle;
     }
 
     .o_vhg_particular,
