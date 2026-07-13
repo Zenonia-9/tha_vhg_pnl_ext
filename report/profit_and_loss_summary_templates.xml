@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="summary_pdf_header">
+        <thead>
+            <tr>
+                <t t-foreach="options['columns'][:7]" t-as="column">
+                    <th><t t-out="column['name']"/></th>
+                </t>
+                <th>Particular</th>
+                <t t-foreach="options['columns'][7:]" t-as="column">
+                    <th><t t-out="column['name']"/></th>
+                </t>
+            </tr>
+        </thead>
+    </template>
+
+    <template id="summary_pdf_body">
+        <t t-foreach="lines" t-as="line">
+            <tr t-att-class="'o_fw_bold' if line.get('level') == 0 else ''">
+                <t t-foreach="line['columns'][:7]" t-as="cell">
+                    <td class="o_cell_td"><t t-call="account_reports.pdf_export_cell"/></td>
+                </t>
+                <td class="o_line_name_level"><t t-out="line['name']"/></td>
+                <t t-foreach="line['columns'][7:]" t-as="cell">
+                    <td class="o_cell_td"><t t-call="account_reports.pdf_export_cell"/></td>
+                </t>
+            </tr>
+        </t>
+    </template>
+</odoo>

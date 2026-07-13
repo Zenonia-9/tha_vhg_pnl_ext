@@ -1,0 +1,15 @@
+.o_account_reports_page.o_vhg_pnl_summary {
+    .o_account_reports_table {
+        min-width: max-content;
+    }
+
+    th,
+    td {
+        white-space: nowrap;
+    }
+
+    .o_vhg_particular,
+    .o_account_report_line_name {
+        min-width: 270px;
+    }
+}

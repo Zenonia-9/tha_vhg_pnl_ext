@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="tha_vhg_pnl_ext.SummaryReportFilters" t-inherit="account_reports.AccountReportFiltersCustomizable">
+        <xpath expr="//div[@id='filter_rounding_unit']" position="before">
+            <button
+                class="btn btn-secondary"
+                t-att-class="{ 'active': controller.cachedFilterOptions.vhg_show_monthly_columns }"
+                t-on-click="toggleMonthlyColumns"
+            >
+                <i class="fa fa-calendar me-1"/>Show Monthly Columns
+            </button>
+            <button
+                class="btn btn-secondary"
+                t-att-class="{ 'active': controller.cachedFilterOptions.vhg_hide_zero_months }"
+                t-on-click="toggleZeroMonths"
+            >
+                <i class="fa fa-eye-slash me-1"/>Hide Zero Months
+            </button>
+        </xpath>
+    </t>
+
+    <t t-name="tha_vhg_pnl_ext.SummaryReportHeader">
+        <thead id="table_header" class="sticky">
+            <tr data-id="column_subheaders_row">
+                <t t-foreach="controller.options.columns.slice(0, 7)" t-as="column" t-key="column_index">
+                    <th class="column_header"><t t-out="column.name"/></th>
+                </t>
+                <th class="column_header o_vhg_particular">Particular</th>
+                <t t-foreach="controller.options.columns.slice(7)" t-as="column" t-key="column_index">
+                    <th class="column_header"><t t-out="column.name"/></th>
+                </t>
+            </tr>
+        </thead>
+    </t>
+
+    <t t-name="tha_vhg_pnl_ext.SummaryReportLine">
+        <tr data-id="line" t-att-class="lineClasses">
+            <t t-foreach="props.line.columns.slice(0, 7)" t-as="cell" t-key="cell_index">
+                <t t-component="env.component('AccountReportLineCell')" t-props="{ line: props.line, cell: cell }"/>
+            </t>
+            <t t-component="env.component('AccountReportLineName')" t-props="{ lineIndex: props.lineIndex, line: props.line }"/>
+            <t t-foreach="props.line.columns.slice(7)" t-as="cell" t-key="cell_index">
+                <t t-component="env.component('AccountReportLineCell')" t-props="{ line: props.line, cell: cell }"/>
+            </t>
+        </tr>
+    </t>
+</templates>
