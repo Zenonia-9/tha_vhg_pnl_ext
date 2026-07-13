@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from collections import defaultdict
+from datetime import datetime
 
 from odoo import models
 from odoo.tools import SQL
@@ -123,15 +124,39 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if not current_column_group_key:
             return
 
+        comparison_filter = previous_options.get("comparison", {}).get("filter")
+        has_previous_period_comparison = comparison_filter == "previous_period" or (
+            comparison_filter == "multi" and previous_options.get("vhg_period_total_enabled")
+        )
+        options["vhg_period_total_enabled"] = has_previous_period_comparison
+        period_total_column_group_key = "vhg_period_total"
         actual_percent_column_group_key = "vhg_actual_percent"
+        if has_previous_period_comparison:
+            balance_column_group_keys = [
+                column["column_group_key"]
+                for column in options["columns"]
+                if column["expression_label"] == "balance"
+            ]
+            period_dates = [
+                options["column_groups"][column_group_key]["forced_options"]["date"]
+                for column_group_key in balance_column_group_keys
+            ]
+            period_total_header = self._period_total_header(period_dates)
+            options["vhg_period_total_balance_column_group_keys"] = balance_column_group_keys
+            options["vhg_period_total_column_group_key"] = period_total_column_group_key
         options["vhg_actual_percent_balance_column_group_key"] = current_column_group_key
         options["vhg_actual_percent_column_group_key"] = actual_percent_column_group_key
-        if any(column["expression_label"] == "actual_percent" for column in options["columns"]):
+        if any(column["expression_label"] in ("period_total", "actual_percent") for column in options["columns"]):
             return
 
         column_groups = {}
         for column_group_key, column_group in options["column_groups"].items():
             if column_group_key == current_column_group_key:
+                if has_previous_period_comparison:
+                    column_groups[period_total_column_group_key] = {
+                        "forced_options": {"vhg_period_total": True},
+                        "forced_domain": [],
+                    }
                 column_groups[actual_percent_column_group_key] = {
                     "forced_options": {
                         "date": dict(options["date"]),
@@ -153,13 +178,40 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     "blank_if_zero": False,
                     "style": "text-align: center; white-space: nowrap;",
                 })
+                if has_previous_period_comparison:
+                    options["columns"].insert(index, {
+                        "name": "Balance",
+                        "column_group_key": period_total_column_group_key,
+                        "expression_label": "period_total",
+                        "sortable": False,
+                    })
                 break
 
         for index, header in enumerate(options["column_headers"][0]):
             header_date = header.get("forced_options", {}).get("date", {})
             if header_date.get("date_from") == options["date"]["date_from"] and header_date.get("date_to") == options["date"]["date_to"]:
+                if has_previous_period_comparison:
+                    options["column_headers"][0].insert(index, {"name": period_total_header})
+                    index += 1
                 options["column_headers"][0].insert(index, {"name": "Actual %"})
                 break
+
+    @staticmethod
+    def _period_total_header(period_dates):
+        dates = [
+            (
+                datetime.strptime(period["date_from"], "%Y-%m-%d").date(),
+                datetime.strptime(period["date_to"], "%Y-%m-%d").date(),
+            )
+            for period in period_dates
+        ]
+        start_date = min(date_from for date_from, _date_to in dates)
+        end_date = max(date_to for _date_from, date_to in dates)
+        if start_date == end_date:
+            return f"{end_date:%b %Y} Total"
+        if start_date.year == end_date.year:
+            return f"{start_date:%b} - {end_date:%b} Total"
+        return f"{start_date:%b %Y} - {end_date:%b %Y}"
 
     def _query_group_balances(self, report, options):
         code_to_group = {
@@ -179,7 +231,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         companies = self.env["res.company"]
 
         for column_group_key, column_options in report._split_options_per_column_group(options).items():
-            if column_group_key == options.get("vhg_actual_percent_column_group_key"):
+            if column_group_key in {
+                options.get("vhg_period_total_column_group_key"),
+                options.get("vhg_actual_percent_column_group_key"),
+            }:
                 continue
             query = report._get_report_query(column_options, "strict_range", domain=pnl_domain)
             self.env.cr.execute(SQL(
@@ -235,9 +290,18 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
     def _columns(self, report, options, balances, actual_percent=None):
         columns = []
         for column in options["columns"]:
+            is_period_total = column["expression_label"] == "period_total"
             is_actual_percent = column["expression_label"] == "actual_percent"
+            value = balances.get(column["column_group_key"], 0.0)
+            if is_period_total:
+                value = sum(
+                    balances.get(column_group_key, 0.0)
+                    for column_group_key in options.get("vhg_period_total_balance_column_group_keys", ())
+                )
+            elif is_actual_percent:
+                value = actual_percent
             columns.append(report._build_column_dict(
-                actual_percent if is_actual_percent else balances.get(column["column_group_key"], 0.0),
+                value,
                 column,
                 options=options,
                 digits=2 if is_actual_percent else 1,
