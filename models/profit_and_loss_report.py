@@ -124,6 +124,32 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if not current_column_group_key:
             return
 
+        synthetic_column_group_keys = {
+            "vhg_period_total",
+            "vhg_actual_percent",
+            options.get("vhg_period_total_column_group_key"),
+            options.get("vhg_actual_percent_column_group_key"),
+            previous_options.get("vhg_period_total_column_group_key"),
+            previous_options.get("vhg_actual_percent_column_group_key"),
+        } - {None}
+        options["columns"] = [
+            column
+            for column in options["columns"]
+            if column["expression_label"] not in ("period_total", "actual_percent")
+            and column["column_group_key"] not in synthetic_column_group_keys
+        ]
+        options["column_groups"] = {
+            column_group_key: column_group
+            for column_group_key, column_group in options["column_groups"].items()
+            if column_group_key not in synthetic_column_group_keys
+        }
+        if options.get("column_headers"):
+            options["column_headers"][0] = [
+                header
+                for header in options["column_headers"][0]
+                if header.get("forced_options")
+            ]
+
         comparison_filter = previous_options.get("comparison", {}).get("filter")
         has_previous_period_comparison = comparison_filter == "previous_period" or (
             comparison_filter == "multi" and previous_options.get("vhg_period_total_enabled")
@@ -146,8 +172,6 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             options["vhg_period_total_column_group_key"] = period_total_column_group_key
         options["vhg_actual_percent_balance_column_group_key"] = current_column_group_key
         options["vhg_actual_percent_column_group_key"] = actual_percent_column_group_key
-        if any(column["expression_label"] in ("period_total", "actual_percent") for column in options["columns"]):
-            return
 
         column_groups = {}
         for column_group_key, column_group in options["column_groups"].items():
