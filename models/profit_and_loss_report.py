@@ -150,18 +150,41 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 if header.get("forced_options")
             ]
 
-        comparison_filter = previous_options.get("comparison", {}).get("filter")
-        has_previous_period_comparison = comparison_filter == "previous_period" or (
-            comparison_filter == "multi" and previous_options.get("vhg_period_total_enabled")
-        )
+        multi_comparison = options.get("multi_comparison")
+        if isinstance(multi_comparison, dict):
+            previous_period_count = (
+                int(multi_comparison.get("previous_period_number", 0) or 0)
+                if multi_comparison.get("previous_period")
+                else 0
+            )
+        else:
+            comparison = options.get("comparison", {})
+            previous_period_count = (
+                int(comparison.get("number_period", 0) or 0)
+                if comparison.get("filter") == "previous_period"
+                else 0
+            )
+        has_previous_period_comparison = previous_period_count > 0
         options["vhg_period_total_enabled"] = has_previous_period_comparison
         period_total_column_group_key = "vhg_period_total"
         actual_percent_column_group_key = "vhg_actual_percent"
         if has_previous_period_comparison:
+            period_date_keys = {
+                (options["date"]["date_from"], options["date"]["date_to"]),
+            }
+            previous_period = options["date"]
+            for _index in range(previous_period_count):
+                previous_period = report._get_shifted_dates_period(options, previous_period, -1)
+                period_date_keys.add((previous_period["date_from"], previous_period["date_to"]))
+
             balance_column_group_keys = [
                 column["column_group_key"]
                 for column in options["columns"]
                 if column["expression_label"] == "balance"
+                and (
+                    options["column_groups"][column["column_group_key"]]["forced_options"]["date"]["date_from"],
+                    options["column_groups"][column["column_group_key"]]["forced_options"]["date"]["date_to"],
+                ) in period_date_keys
             ]
             period_dates = [
                 options["column_groups"][column_group_key]["forced_options"]["date"]

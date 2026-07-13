@@ -2,7 +2,7 @@
 {
     "name": "VHG Profit and Loss Extension",
     "summary": "Workbook-aligned VHG Profit and Loss report with foldable account groups.",
-    "version": "19.0.1.0.8",
+    "version": "19.0.1.0.9",
     "category": "Accounting/Accounting",
     "author": "Thein Htoo Aung",
     "license": "LGPL-3",
