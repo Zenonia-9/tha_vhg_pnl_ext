@@ -143,13 +143,6 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             for column_group_key, column_group in options["column_groups"].items()
             if column_group_key not in synthetic_column_group_keys
         }
-        if options.get("column_headers"):
-            options["column_headers"][0] = [
-                header
-                for header in options["column_headers"][0]
-                if header.get("forced_options")
-            ]
-
         multi_comparison = options.get("multi_comparison")
         if isinstance(multi_comparison, dict):
             previous_period_count = (
@@ -181,6 +174,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 column["column_group_key"]
                 for column in options["columns"]
                 if column["expression_label"] == "balance"
+                and not options["column_groups"][column["column_group_key"]]["forced_options"].get("compute_budget")
+                and not options["column_groups"][column["column_group_key"]]["forced_options"].get("budget_percentage")
                 and (
                     options["column_groups"][column["column_group_key"]]["forced_options"]["date"]["date_from"],
                     options["column_groups"][column["column_group_key"]]["forced_options"]["date"]["date_to"],
@@ -234,14 +229,42 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     })
                 break
 
-        for index, header in enumerate(options["column_headers"][0]):
-            header_date = header.get("forced_options", {}).get("date", {})
-            if header_date.get("date_from") == options["date"]["date_from"] and header_date.get("date_to") == options["date"]["date_to"]:
-                if has_previous_period_comparison:
-                    options["column_headers"][0].insert(index, {"name": period_total_header})
-                    index += 1
-                options["column_headers"][0].insert(index, {"name": "Actual %"})
-                break
+        budget_names = {
+            budget["id"]: budget["name"]
+            for budget in options.get("budgets", [])
+            if budget.get("selected")
+        }
+        date_headers = []
+        for column in options["columns"]:
+            column_group_key = column["column_group_key"]
+            if column_group_key in (period_total_column_group_key, actual_percent_column_group_key):
+                continue
+            forced_options = options["column_groups"][column_group_key]["forced_options"]
+            if budget_id := forced_options.get("compute_budget"):
+                column["name"] = budget_names.get(budget_id, "Budget")
+            elif forced_options.get("budget_percentage"):
+                column["name"] = "%"
+
+            column_date = forced_options.get("date", {})
+            date_key = (column_date.get("date_from"), column_date.get("date_to"))
+            if date_headers and date_headers[-1]["date_key"] == date_key:
+                date_headers[-1]["colspan"] += 1
+            else:
+                date_headers.append({
+                    "date_key": date_key,
+                    "name": column_date.get("string", ""),
+                    "colspan": 1,
+                })
+
+        headers = []
+        if has_previous_period_comparison:
+            headers.append({"name": period_total_header, "colspan": 1})
+        headers.append({"name": "Actual %", "colspan": 1})
+        headers.extend(
+            {"name": header["name"], "colspan": header["colspan"]}
+            for header in date_headers
+        )
+        options["column_headers"] = [headers]
 
     @staticmethod
     def _period_total_header(period_dates):
