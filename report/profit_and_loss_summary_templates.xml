@@ -3,10 +3,17 @@
     <template id="summary_pdf_header">
         <thead>
             <tr>
-                <t t-foreach="options['columns'][:7]" t-as="column">
+                <th colspan="6">Month to Date</th>
+                <th rowspan="2">No.</th>
+                <th rowspan="2">Particular</th>
+                <th colspan="2">Year to Date</th>
+                <th t-if="len(options['columns']) &gt; 13" t-att-colspan="len(options['columns']) - 13">Monthly Actual</th>
+                <th colspan="4">Full Year</th>
+            </tr>
+            <tr>
+                <t t-foreach="options['columns'][:6]" t-as="column">
                     <th><t t-out="column['name']"/></th>
                 </t>
-                <th>Particular</th>
                 <t t-foreach="options['columns'][7:]" t-as="column">
                     <th><t t-out="column['name']"/></th>
                 </t>

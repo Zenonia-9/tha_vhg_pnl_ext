@@ -9,23 +9,24 @@
             >
                 <i class="fa fa-calendar me-1"/>Show Monthly Columns
             </button>
-            <button
-                class="btn btn-secondary"
-                t-att-class="{ 'active': controller.cachedFilterOptions.vhg_hide_zero_months }"
-                t-on-click="toggleZeroMonths"
-            >
-                <i class="fa fa-eye-slash me-1"/>Hide Zero Months
-            </button>
         </xpath>
     </t>
 
     <t t-name="tha_vhg_pnl_ext.SummaryReportHeader">
         <thead id="table_header" class="sticky">
+            <t t-set="monthCount" t-value="controller.options.columns.length - 13"/>
+            <tr data-id="column_headers_row">
+                <th class="column_header" colspan="6">Month to Date</th>
+                <th class="column_header" rowspan="2">No.</th>
+                <th class="column_header o_vhg_particular" rowspan="2">Particular</th>
+                <th class="column_header" colspan="2">Year to Date</th>
+                <th t-if="monthCount" class="column_header" t-att-colspan="monthCount">Monthly Actual</th>
+                <th class="column_header" colspan="4">Full Year</th>
+            </tr>
             <tr data-id="column_subheaders_row">
-                <t t-foreach="controller.options.columns.slice(0, 7)" t-as="column" t-key="column_index">
+                <t t-foreach="controller.options.columns.slice(0, 6)" t-as="column" t-key="column_index">
                     <th class="column_header"><t t-out="column.name"/></th>
                 </t>
-                <th class="column_header o_vhg_particular">Particular</th>
                 <t t-foreach="controller.options.columns.slice(7)" t-as="column" t-key="column_index">
                     <th class="column_header"><t t-out="column.name"/></th>
                 </t>

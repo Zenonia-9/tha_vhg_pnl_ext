@@ -27,15 +27,24 @@ class AccountReport(models.Model):
         total_percentage = workbook.add_format({"border": 1, "bold": True, "num_format": "0.00%"})
 
         columns = print_options["columns"]
-        labels = [column["name"] for column in columns[:7]] + ["Particular"] + [
-            column["name"] for column in columns[7:]
-        ]
-        for x, label in enumerate(labels):
-            sheet.write(0, x, label, header)
+        month_count = len(columns) - 13
+        sheet.merge_range(0, 0, 0, 5, "Month to Date", header)
+        sheet.merge_range(0, 6, 1, 6, "No.", header)
+        sheet.merge_range(0, 7, 1, 7, "Particular", header)
+        sheet.merge_range(0, 8, 0, 9, "Year to Date", header)
+        if month_count:
+            sheet.merge_range(0, 10, 0, 9 + month_count, "Monthly Actual", header)
+        full_year_start = 10 + month_count
+        sheet.merge_range(0, full_year_start, 0, full_year_start + 3, "Full Year", header)
+        subheaders = columns[:6] + columns[7:]
+        subheader_positions = list(range(6)) + list(range(8, 8 + len(columns) - 7))
+        for x, column in zip(subheader_positions, subheaders):
+            sheet.write(1, x, column["name"], header)
+        labels = columns[:7] + [{"name": "Particular"}] + columns[7:]
         sheet.set_column(0, len(labels) - 1, 14)
         sheet.set_column(7, 7, 34)
 
-        for y, line in enumerate(lines, start=1):
+        for y, line in enumerate(lines, start=2):
             is_total = line.get("level") == 0
             values = line["columns"][:7] + [{"no_format": line["name"], "figure_type": "string"}] + line["columns"][7:]
             for x, cell in enumerate(values):

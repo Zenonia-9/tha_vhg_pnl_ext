@@ -60,10 +60,8 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             budget["selected"] = budget["id"] in selected_budget_ids
 
         show_months = previous_options.get("vhg_show_monthly_columns", True)
-        hide_zero_months = previous_options.get("vhg_hide_zero_months", False)
         options.update({
             "vhg_show_monthly_columns": bool(show_months),
-            "vhg_hide_zero_months": bool(hide_zero_months),
             "vhg_summary_month_keys": [],
             "vhg_summary_selected_month_key": f"actual_{month_start:%Y_%m}",
             "vhg_summary_ytd_month_keys": [
@@ -134,25 +132,25 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
 
     def _display_columns(self, months):
         columns = [
-            self._column("MTD Actual", "mtd_actual"),
-            self._column("Actual %", "mtd_actual_percent", "percentage"),
-            self._column("MTD Budget", "mtd_budget"),
-            self._column("Budget %", "mtd_budget_percent", "percentage"),
+            self._column("Actual", "mtd_actual"),
+            self._column("%", "mtd_actual_percent", "percentage"),
+            self._column("Budget", "mtd_budget"),
+            self._column("%", "mtd_budget_percent", "percentage"),
             self._column("Variance", "mtd_variance"),
-            self._column("Variance %", "mtd_variance_percent", "percentage"),
+            self._column("%", "mtd_variance_percent", "percentage"),
             self._column("No.", "sequence", "string"),
-            self._column("YTD Actual", "ytd_actual"),
-            self._column("Actual %", "ytd_actual_percent", "percentage"),
+            self._column("Actual", "ytd_actual"),
+            self._column("%", "ytd_actual_percent", "percentage"),
         ]
         columns.extend(
             self._column(start.strftime("%b %Y"), f"month_{start:%Y_%m}")
             for start, _end in months
         )
         columns.extend([
-            self._column("FY Budget", "fy_budget"),
-            self._column("Budget %", "fy_budget_percent", "percentage"),
+            self._column("Budget", "fy_budget"),
+            self._column("%", "fy_budget_percent", "percentage"),
             self._column("Variance", "fy_variance"),
-            self._column("Variance %", "fy_variance_percent", "percentage"),
+            self._column("%", "fy_variance_percent", "percentage"),
         ])
         return columns
 
@@ -268,18 +266,6 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     def _dynamic_lines_generator(self, report, options, all_column_groups_expression_totals, warnings=None):
         group_balances = self._query_summary_balances(report, options)
         values = self._summary_values(group_balances)
-
-        if options.get("vhg_show_monthly_columns") and options.get("vhg_hide_zero_months"):
-            zero_month_labels = {
-                f"month_{key.removeprefix('actual_')}"
-                for key in options["vhg_summary_month_keys"]
-                if not any(values[group_key][key] for group_key in values)
-            }
-            options["columns"] = [
-                column for column in options["columns"]
-                if column["expression_label"] not in zero_month_labels
-            ]
-            options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
 
         group_names = {key: name for key, name, _sign, _codes in self._GROUPS}
         group_names.update({

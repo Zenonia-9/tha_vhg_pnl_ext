@@ -19,6 +19,10 @@ base_previous = {
 }
 no_budget_options = report.get_options(base_previous)
 no_budget_lines = report._get_lines(no_budget_options)
+assert "vhg_hide_zero_months" not in no_budget_options
+assert [column["name"] for column in no_budget_options["columns"][:9]] == [
+    "Actual", "%", "Budget", "%", "Variance", "%", "No.", "Actual", "%",
+]
 assert len(no_budget_lines) == 26, len(no_budget_lines)
 assert all(not line.get("unfoldable") for line in no_budget_lines)
 assert all(not line.get("expand_function") for line in no_budget_lines)
@@ -58,6 +62,12 @@ assert not any(column["expression_label"].startswith("month_") for column in hid
 
 xlsx = report.export_to_xlsx(budget_options)
 assert len(xlsx["file_content"]) > 1000
+from io import BytesIO
+from zipfile import ZipFile
+with ZipFile(BytesIO(xlsx["file_content"])) as workbook:
+    worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
+    for merged_range in (b'A1:F1', b'G1:G2', b'H1:H2', b'I1:J1', b'K1:V1', b'W1:Z1'):
+        assert merged_range in worksheet_xml, merged_range
 pdf = report.export_to_pdf(budget_options)
 assert len(pdf["file_content"]) > 1000
 

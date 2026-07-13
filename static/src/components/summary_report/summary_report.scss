@@ -8,6 +8,17 @@
         white-space: nowrap;
     }
 
+    tr[data-id="column_headers_row"] th {
+        border-bottom: 1px solid var(--border-color, #45495a);
+        font-weight: 700;
+        text-align: center;
+    }
+
+    tr[data-id="column_subheaders_row"] th {
+        font-weight: 600;
+        text-align: center;
+    }
+
     .o_vhg_particular,
     .o_account_report_line_name {
         min-width: 270px;
