@@ -15,6 +15,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     _description = "VHG Management Profit and Loss Summary Handler"
 
     _DEMO_BUDGET_NAME = "VHG Summary Demo Budget FY2026-27"
+    _DEMO_BUDGET_PREFIX = "VHG Summary Demo Budget "
     _REVENUE_GROUPS = ("inpatient", "outpatient", "eopd_day_care")
     _OTHER_REVENUE_GROUPS = (
         "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
@@ -338,51 +339,91 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         if missing:
             raise UserError(_("Mapped COA codes missing from THA: %s", ", ".join(missing)))
 
-        budget = self.env["account.report.budget"].search([
+        months = [date(2026, 4, 1) + relativedelta(months=index) for index in range(12)]
+        monthly_names = [
+            f"{self._DEMO_BUDGET_PREFIX}{month:%b}".replace(
+                f"{month:%b}", month.strftime("%b").upper()
+            ) + f" {month:%y}"
+            for month in months
+        ]
+        annual_matches = self.env["account.report.budget"].search([
             ("name", "=", self._DEMO_BUDGET_NAME),
             ("company_id", "=", company.id),
-        ], limit=1)
-        if not budget:
-            budget = self.env["account.report.budget"].create({
+        ], order="id")
+        annual_budget = annual_matches[:1]
+        duplicate_budgets = annual_matches[1:]
+        if not annual_budget:
+            annual_budget = self.env["account.report.budget"].create({
                 "name": self._DEMO_BUDGET_NAME,
                 "company_id": company.id,
             })
+        removed = len(duplicate_budgets.item_ids)
+        duplicate_budgets.unlink()
 
-        months = [date(2026, 4, 1) + relativedelta(months=index) for index in range(12)]
-        existing = {
-            (item.account_id.id, item.date): item
-            for item in budget.item_ids
-        }
-        expected_keys = set()
+        budgets = {}
+        duplicate_budgets = self.env["account.report.budget"]
+        for name in monthly_names:
+            matches = self.env["account.report.budget"].search([
+                ("name", "=", name),
+                ("company_id", "=", company.id),
+            ], order="id")
+            budget = matches[:1]
+            duplicate_budgets |= matches[1:]
+            if not budget:
+                budget = self.env["account.report.budget"].create({
+                    "name": name,
+                    "company_id": company.id,
+                })
+            budgets[name] = budget
+        removed += len(duplicate_budgets.item_ids)
+        duplicate_budgets.unlink()
+        budgets[self._DEMO_BUDGET_NAME] = annual_budget
+
         created = updated = 0
-        for code in codes:
-            account = account_by_code[code]
-            group_index, account_index, sign = code_meta[code]
-            for month_index, month in enumerate(months, start=1):
-                key = (account.id, month)
-                expected_keys.add(key)
-                display_amount = 100000 + group_index * 10000 + account_index * 100 + month_index * 1000
-                amount = display_amount * sign
-                item = existing.get(key)
-                if item:
-                    if item.amount != amount:
-                        item.amount = amount
-                        updated += 1
-                else:
-                    self.env["account.report.budget.item"].create({
-                        "budget_id": budget.id,
-                        "account_id": account.id,
-                        "date": month,
-                        "amount": amount,
-                    })
-                    created += 1
-        extras = budget.item_ids.filtered(lambda item: (item.account_id.id, item.date) not in expected_keys)
-        removed = len(extras)
-        extras.unlink()
+        items_per_budget = {}
+        budget_targets = [(annual_budget, list(enumerate(months, start=1)))]
+        budget_targets.extend(
+            (budgets[monthly_names[month_index - 1]], [(month_index, month)])
+            for month_index, month in enumerate(months, start=1)
+        )
+        for budget, target_months in budget_targets:
+            existing = {
+                (item.account_id.id, item.date): item
+                for item in budget.item_ids
+            }
+            expected_keys = set()
+            for month_index, month in target_months:
+                for code in codes:
+                    account = account_by_code[code]
+                    group_index, account_index, sign = code_meta[code]
+                    key = (account.id, month)
+                    expected_keys.add(key)
+                    display_amount = 100000 + group_index * 10000 + account_index * 100 + month_index * 1000
+                    amount = display_amount * sign
+                    item = existing.get(key)
+                    if item:
+                        if item.amount != amount:
+                            item.amount = amount
+                            updated += 1
+                    else:
+                        self.env["account.report.budget.item"].create({
+                            "budget_id": budget.id,
+                            "account_id": account.id,
+                            "date": month,
+                            "amount": amount,
+                        })
+                        created += 1
+            extras = budget.item_ids.filtered(
+                lambda item: (item.account_id.id, item.date) not in expected_keys
+            )
+            removed += len(extras)
+            extras.unlink()
+            items_per_budget[budget.name] = len(expected_keys)
         return {
-            "budget_id": budget.id,
+            "budget_ids": [budgets[name].id for name in monthly_names] + [annual_budget.id],
+            "budget_names": monthly_names + [self._DEMO_BUDGET_NAME],
             "created": created,
             "updated": updated,
             "removed": removed,
-            "items": len(expected_keys),
+            "items_per_budget": items_per_budget,
         }

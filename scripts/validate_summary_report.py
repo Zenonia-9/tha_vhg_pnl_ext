@@ -4,10 +4,14 @@ company = env["res.company"].search([
 report = env.ref("tha_vhg_pnl_ext.report_vhg_profit_and_loss_summary").with_company(company).with_context(
     allowed_company_ids=[company.id]
 )
-budget = env["account.report.budget"].search([
-    ("name", "=", "VHG Summary Demo Budget FY2026-27"),
+budget = env["account.report.budget"].sudo().with_company(company).search([
+    ("name", "=", "VHG Summary Demo Budget JUL 26"),
 ], limit=1)
 assert budget, "Demo budget is missing"
+fy_budget = env["account.report.budget"].sudo().with_company(company).search([
+    ("name", "=", "VHG Summary Demo Budget FY2026-27"),
+], limit=1)
+assert fy_budget and len(fy_budget.item_ids) == 2832
 
 base_previous = {
     "date": {
@@ -48,7 +52,7 @@ budget_previous["budgets"] = [{"id": budget.id, "selected": True}]
 budget_options = report.get_options(budget_previous)
 budget_lines = report._get_lines(budget_options)
 assert len(budget_lines) == 26
-assert len([item for item in budget.item_ids if item.date.year in (2026, 2027)]) == 2832
+assert len(budget.item_ids) == 236
 assert any(
     cell.get("no_format")
     for line in budget_lines
