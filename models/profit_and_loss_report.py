@@ -210,6 +210,24 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             column_groups[column_group_key] = column_group
         options["column_groups"] = column_groups
 
+        budget_base_column_groups = {}
+        budget_column_groups = {}
+        budget_percentage_column_groups = {}
+        for column_group_key, column_group in options["column_groups"].items():
+            forced_options = column_group["forced_options"]
+            column_date = forced_options.get("date", {})
+            date_key = (column_date.get("date_from"), column_date.get("date_to"))
+            if forced_options.get("budget_base"):
+                budget_base_column_groups[date_key] = column_group_key
+            elif budget_id := forced_options.get("compute_budget"):
+                budget_column_groups[(date_key, budget_id)] = column_group_key
+            elif budget_id := forced_options.get("budget_percentage"):
+                budget_percentage_column_groups[column_group_key] = (
+                    budget_base_column_groups.get(date_key),
+                    budget_column_groups.get((date_key, budget_id)),
+                )
+        options["vhg_budget_percentage_column_groups"] = budget_percentage_column_groups
+
         for index, column in enumerate(options["columns"]):
             if column["column_group_key"] == current_column_group_key and column["expression_label"] == "balance":
                 options["columns"].insert(index, {
@@ -246,7 +264,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             if budget_id := forced_options.get("compute_budget"):
                 column["name"] = budget_names.get(budget_id, "Budget")
             elif forced_options.get("budget_percentage"):
-                column["name"] = "%"
+                column.update({
+                    "name": "%",
+                    "figure_type": "percentage",
+                    "blank_if_zero": False,
+                })
 
             column_date = forced_options.get("date", {})
             date_key = (column_date.get("date_from"), column_date.get("date_to"))
@@ -365,6 +387,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         for column in options["columns"]:
             is_period_total = column["expression_label"] == "period_total"
             is_actual_percent = column["expression_label"] == "actual_percent"
+            budget_percentage_column_groups = options.get("vhg_budget_percentage_column_groups", {})
+            budget_percentage_group_keys = budget_percentage_column_groups.get(column["column_group_key"])
             value = balances.get(column["column_group_key"], 0.0)
             if is_period_total:
                 value = sum(
@@ -373,11 +397,19 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 )
             elif is_actual_percent:
                 value = actual_percent
+            elif budget_percentage_group_keys:
+                actual_column_group_key, budget_column_group_key = budget_percentage_group_keys
+                budget_value = balances.get(budget_column_group_key, 0.0)
+                value = (
+                    balances.get(actual_column_group_key, 0.0) * 100.0 / budget_value
+                    if budget_value
+                    else None
+                )
             columns.append(report._build_column_dict(
                 value,
                 column,
                 options=options,
-                digits=2 if is_period_total or is_actual_percent else 1,
+                digits=2 if is_period_total or is_actual_percent or budget_percentage_group_keys else 1,
             ))
         return columns
 
