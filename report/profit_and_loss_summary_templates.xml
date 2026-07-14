@@ -1,14 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <template id="notes_pdf_header">
+        <thead>
+            <t t-foreach="options['vhg_notes_header_rows']" t-as="header_row">
+                <tr>
+                    <th/>
+                    <t t-foreach="header_row" t-as="header">
+                        <th
+                            t-att-colspan="header.get('colspan', 1)"
+                            t-att-rowspan="header.get('rowspan', 1)"
+                        >
+                            <t t-out="header['name']"/>
+                        </th>
+                    </t>
+                </tr>
+            </t>
+            <tr>
+                <th/>
+                <t t-foreach="options['columns']" t-as="column">
+                    <th><t t-out="column['name']"/></th>
+                </t>
+            </tr>
+        </thead>
+    </template>
+
     <template id="summary_pdf_header">
         <thead>
             <tr>
-                <th colspan="6">Month to Date</th>
+                <th colspan="6"><t t-out="options['vhg_summary_mtd_label']"/></th>
                 <th rowspan="2">No.</th>
                 <th rowspan="2">Particular</th>
-                <th colspan="2">Year to Date</th>
+                <th colspan="2"><t t-out="options['vhg_summary_ytd_actual_label']"/></th>
                 <th t-if="len(options['columns']) &gt; 13" t-att-colspan="len(options['columns']) - 13">Monthly Actual</th>
-                <th colspan="4">Full Year</th>
+                <th colspan="4"><t t-out="options['vhg_summary_ytd_budget_label']"/></th>
             </tr>
             <tr>
                 <t t-foreach="options['columns'][:6]" t-as="column">

@@ -19,19 +19,19 @@ options = report.get_options({
 })
 lines = report._get_lines(options)
 
-assert len(options["columns"]) == 8
-assert sum(header.get("colspan", 1) for header in options["column_headers"][0]) == 8
+assert len(options["columns"]) == 9
+assert sum(header.get("colspan", 1) for header in options["column_headers"][0]) == 9
 assert [header["name"] for header in options["column_headers"][0]] == [
-    "Jun - Jul Total", "Actual %", "Jul 2026", "Jun 2026",
+    "Jun - Jul Total", "Jul 2026", "Jun 2026",
 ]
-assert [header["colspan"] for header in options["column_headers"][0]] == [1, 1, 3, 3]
-assert all(len(line["columns"]) == 8 for line in lines)
+assert [header["colspan"] for header in options["column_headers"][0]] == [1, 4, 4]
+assert all(len(line["columns"]) == 9 for line in lines)
 assert options["columns"][4]["name"] == "%"
 assert options["columns"][4]["figure_type"] == "percentage"
 
 outpatient = next(line for line in lines if line["name"] == "Outpatient (Revenue)")
 assert outpatient["columns"][0]["no_format"] == (
-    outpatient["columns"][2]["no_format"] + outpatient["columns"][5]["no_format"]
+    outpatient["columns"][2]["no_format"] + outpatient["columns"][6]["no_format"]
 )
 assert outpatient["columns"][4]["name"].endswith("%")
 assert outpatient["columns"][4]["name"] != outpatient["columns"][2]["name"]
@@ -53,6 +53,28 @@ expected_budget_percentage = report._compute_column_percent_comparison_data(
 assert bone_dxa["columns"][4]["name"] == expected_budget_percentage["name"]
 assert bone_dxa["columns"][4]["comparison_mode"] == expected_budget_percentage["mode"]
 assert bone_dxa["columns"][4]["figure_type"] == "string"
+assert bone_dxa["columns"][1]["name"].endswith("%")
+assert bone_dxa["columns"][5]["name"].endswith("%")
+
+taxes = next(line for line in lines if line["name"] == "Taxes")
+total_expenses = next(line for line in lines if line["name"] == "Total Expenses")
+assert lines.index(taxes) < lines.index(total_expenses)
+
+horizontal_group_id = options["available_horizontal_groups"][0]["id"]
+horizontal_options = report.get_options({
+    "date": options["date"],
+    "selected_horizontal_group_id": horizontal_group_id,
+})
+horizontal_lines = report._get_lines(horizontal_options)
+assert horizontal_options["selected_horizontal_group_id"] == horizontal_group_id
+assert len(horizontal_options["vhg_notes_header_rows"]) == 2
+assert sum(
+    header["colspan"] for header in horizontal_options["vhg_notes_header_rows"][0]
+) == len(horizontal_options["columns"])
+assert all(
+    len(line["columns"]) == len(horizontal_options["columns"])
+    for line in horizontal_lines
+)
 
 xlsx = report.export_to_xlsx(options)
 pdf = report.export_to_pdf(options)
@@ -70,12 +92,12 @@ options_without_budget = report.get_options({
     "budgets": [],
 })
 lines_without_budget = report._get_lines(options_without_budget)
-assert len(options_without_budget["columns"]) == 4
+assert len(options_without_budget["columns"]) == 5
 assert sum(
     header.get("colspan", 1)
     for header in options_without_budget["column_headers"][0]
-) == 4
-assert all(len(line["columns"]) == 4 for line in lines_without_budget)
+) == 5
+assert all(len(line["columns"]) == 5 for line in lines_without_budget)
 
 print({
     "columns": len(options["columns"]),

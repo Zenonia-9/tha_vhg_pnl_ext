@@ -2,7 +2,7 @@
 {
     "name": "VHG Profit and Loss Extension",
     "summary": "Workbook-aligned VHG Profit and Loss notes and management summary reports.",
-    "version": "19.0.1.1.8",
+    "version": "19.0.1.2.0",
     "category": "Accounting/Accounting",
     "author": "Thein Htoo Aung",
     "license": "LGPL-3",

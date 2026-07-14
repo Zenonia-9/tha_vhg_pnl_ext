@@ -36,10 +36,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "500415", "500420", "500425", "500600", "510100", "510105",
             "510110", "510115", "510120",
         )),
+        # 510585 Need to Remove
         ("non_hospital_revenue", "Non Hospital Revenue (Rental & Other) By F&A", -1, (
             "510500", "510510", "510515", "510520", "510530", "510535",
             "510540", "510575", "510565", "510545", "510555", "510505",
-            "510560", "510570", "510580", "510585",
+            "510560", "510570", "510580",
         )),
         ("rental_complex", "Rental Complex Building & BIS By F&A", -1, (
             "510085", "510095", "510125", "510130",
@@ -50,17 +51,19 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "600160", "600190", "600200", "600210", "600220", "600181", "600182",
             "600183", "600184", "600185", "600186",
         )),
+        # 702316 Need to Remove
         ("operating_cost", "Operating Cost", 1, (
             "700010", "700020", "700030", "700040", "700050", "700060",
             "700080", "700090", "700100", "700110", "700120", "700130",
-            "700140", "700170", "700180", "700190", "700070", "700150",
+            "700140", "700170", "700190", "700070", "700150",
             "700160", "700200", "700210", "700220", "702311", "701150",
-            "701160", "701173", "701175", "702315", "702316", "703085", "704055",
+            "701160", "701173", "701175", "702315", "703085", "704055",
         )),
+        # 703060 Move to Repair & Maintenance
         ("staff_cost", "Staff Cost (Based on Head Count)", 1, (
             "701010", "701030", "701040", "701050", "701060", "701070",
             "701080", "701090", "701100", "701110", "701120", "701130",
-            "701140", "701170", "701171", "701172", "703060",
+            "701140", "701170", "701171", "701172",
         )),
         ("bonus", "Bonus", 1, ("701020",)),
         ("administrative", "Administrative & Other Expenses", 1, (
@@ -69,15 +72,17 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "702130", "702140", "702150", "702160", "702170", "702180",
             "702190", "702200", "702210", "702220", "702230", "702240",
             "702250", "702260", "702270", "702280", "702290", "702300",
-            "702310", "707030",
+            "702310",
         )),
+        # 703060 Get from Staff Cost
         ("repair_maintenance", "Repair & Maintenance", 1, (
             "703010", "703020", "703030", "703040", "703050", "703070",
-            "703080",
+            "703080", "703060",
         )),
         ("sales_marketing", "Sales & Marketing", 1, (
             "704010", "704020", "704030", "704040", "704050",
         )),
+        ("taxes", "Taxes", 1, ("707020", "707030", "700180")),
         ("depreciation", "Depreciation & Amortization", 1, (
             "705010", "705020", "705030", "705040", "705050", "705060",
             "705070", "705080", "705090", "705100", "705110", "705120",
@@ -88,12 +93,12 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "706010", "706020", "706030", "706040", "706050", "706060",
             "706070", "706080",
         )),
-        ("income_tax", "Income Tax", 1, ("707010", "707020")),
+        ("income_tax", "Income Tax", 1, ("707010",)),
     )
 
     _OPERATING_EXPENSE_GROUPS = (
         "cost_of_goods_sold", "operating_cost", "staff_cost", "bonus",
-        "administrative", "repair_maintenance", "sales_marketing",
+        "administrative", "repair_maintenance", "sales_marketing", "taxes",
     )
 
     _SHARED_PERCENTAGE_GROUPS = {
@@ -113,26 +118,19 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
     }
 
     def _custom_options_initializer(self, report, options, previous_options):
-        current_column_group_key = next(
-            (
-                column_group_key
-                for column_group_key, column_group in options["column_groups"].items()
-                if column_group.get("forced_options", {}).get("date", {}).get("date_from") == options["date"]["date_from"]
-                and column_group.get("forced_options", {}).get("date", {}).get("date_to") == options["date"]["date_to"]
-            ),
-            None,
-        )
-        if not current_column_group_key:
-            return
+        horizontal_header_names = {}
+        for header_level in options.get("column_headers", []):
+            for header in header_level:
+                horizontal_element = header.get("horizontal_groupby_element")
+                if horizontal_element:
+                    horizontal_header_names[tuple(sorted(horizontal_element.items()))] = header["name"]
 
         synthetic_column_group_keys = {
-            "vhg_period_total",
-            "vhg_actual_percent",
-            options.get("vhg_period_total_column_group_key"),
-            options.get("vhg_actual_percent_column_group_key"),
-            previous_options.get("vhg_period_total_column_group_key"),
-            previous_options.get("vhg_actual_percent_column_group_key"),
-        } - {None}
+            column_group_key
+            for column_group_key, column_group in options["column_groups"].items()
+            if column_group.get("forced_options", {}).get("vhg_period_total")
+            or column_group.get("forced_options", {}).get("vhg_actual_percent")
+        }
         options["columns"] = [
             column
             for column in options["columns"]
@@ -161,7 +159,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         has_previous_period_comparison = previous_period_count > 0
         options["vhg_period_total_enabled"] = has_previous_period_comparison
         period_total_column_group_key = "vhg_period_total"
-        actual_percent_column_group_key = "vhg_actual_percent"
+        period_total_header = ""
         if has_previous_period_comparison:
             period_date_keys = {
                 (options["date"]["date_from"], options["date"]["date_to"]),
@@ -189,26 +187,62 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             period_total_header = self._period_total_header(period_dates)
             options["vhg_period_total_balance_column_group_keys"] = balance_column_group_keys
             options["vhg_period_total_column_group_key"] = period_total_column_group_key
-        options["vhg_actual_percent_balance_column_group_key"] = current_column_group_key
-        options["vhg_actual_percent_column_group_key"] = actual_percent_column_group_key
 
+        native_columns = list(options["columns"])
+        native_column_groups = options["column_groups"]
         column_groups = {}
-        for column_group_key, column_group in options["column_groups"].items():
-            if column_group_key == current_column_group_key:
-                if has_previous_period_comparison:
-                    column_groups[period_total_column_group_key] = {
-                        "forced_options": {"vhg_period_total": True},
-                        "forced_domain": [],
-                    }
-                column_groups[actual_percent_column_group_key] = {
+        columns = []
+        actual_percent_column_groups = {}
+        if has_previous_period_comparison:
+            column_groups[period_total_column_group_key] = {
+                "forced_options": {"vhg_period_total": True},
+                "forced_domain": [],
+            }
+            columns.append({
+                "name": "Balance",
+                "column_group_key": period_total_column_group_key,
+                "expression_label": "period_total",
+                "sortable": False,
+                "figure_type": "monetary",
+                "blank_if_zero": False,
+            })
+
+        for column in native_columns:
+            column_group_key = column["column_group_key"]
+            column_group = native_column_groups[column_group_key]
+            forced_options = column_group["forced_options"]
+            is_actual_balance = (
+                column["expression_label"] == "balance"
+                and not forced_options.get("compute_budget")
+                and not forced_options.get("budget_percentage")
+            )
+            if is_actual_balance:
+                actual_percent_column_group_key = f"vhg_actual_percent_{len(actual_percent_column_groups)}"
+                actual_percent_column_groups[actual_percent_column_group_key] = column_group_key
+                percent_column_group = {
                     "forced_options": {
-                        "date": dict(options["date"]),
-                        "vhg_actual_percent": True,
+                        "date": dict(forced_options.get("date", {})),
+                        "vhg_actual_percent": column_group_key,
                     },
                     "forced_domain": [],
                 }
+                if column_group.get("horizontal_groupby_element"):
+                    percent_column_group["horizontal_groupby_element"] = column_group["horizontal_groupby_element"]
+                column_groups[actual_percent_column_group_key] = percent_column_group
+                columns.append({
+                    "name": "%",
+                    "column_group_key": actual_percent_column_group_key,
+                    "expression_label": "actual_percent",
+                    "sortable": False,
+                    "figure_type": "percentage",
+                    "blank_if_zero": False,
+                    "style": "text-align: center; white-space: nowrap;",
+                })
             column_groups[column_group_key] = column_group
+            columns.append(column)
         options["column_groups"] = column_groups
+        options["columns"] = columns
+        options["vhg_actual_percent_column_groups"] = actual_percent_column_groups
 
         budget_base_column_groups = {}
         budget_column_groups = {}
@@ -228,37 +262,14 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 )
         options["vhg_budget_percentage_column_groups"] = budget_percentage_column_groups
 
-        for index, column in enumerate(options["columns"]):
-            if column["column_group_key"] == current_column_group_key and column["expression_label"] == "balance":
-                options["columns"].insert(index, {
-                    "name": "%",
-                    "column_group_key": actual_percent_column_group_key,
-                    "expression_label": "actual_percent",
-                    "sortable": False,
-                    "figure_type": "percentage",
-                    "blank_if_zero": False,
-                    "style": "text-align: center; white-space: nowrap;",
-                })
-                if has_previous_period_comparison:
-                    options["columns"].insert(index, {
-                        "name": "Balance",
-                        "column_group_key": period_total_column_group_key,
-                        "expression_label": "period_total",
-                        "sortable": False,
-                        "figure_type": "monetary",
-                        "blank_if_zero": False,
-                    })
-                break
-
         budget_names = {
             budget["id"]: budget["name"]
             for budget in options.get("budgets", [])
             if budget.get("selected")
         }
-        date_headers = []
         for column in options["columns"]:
             column_group_key = column["column_group_key"]
-            if column_group_key in (period_total_column_group_key, actual_percent_column_group_key):
+            if column_group_key == period_total_column_group_key:
                 continue
             forced_options = options["column_groups"][column_group_key]["forced_options"]
             if budget_id := forced_options.get("compute_budget"):
@@ -270,26 +281,79 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     "blank_if_zero": False,
                 })
 
+        top_headers = []
+        if has_previous_period_comparison:
+            top_headers.append({"name": period_total_header, "colspan": 1})
+        for column in options["columns"]:
+            if column["column_group_key"] == period_total_column_group_key:
+                continue
+            forced_options = options["column_groups"][column["column_group_key"]]["forced_options"]
             column_date = forced_options.get("date", {})
             date_key = (column_date.get("date_from"), column_date.get("date_to"))
-            if date_headers and date_headers[-1]["date_key"] == date_key:
-                date_headers[-1]["colspan"] += 1
+            if top_headers and top_headers[-1].get("date_key") == date_key:
+                top_headers[-1]["colspan"] += 1
             else:
-                date_headers.append({
+                top_headers.append({
                     "date_key": date_key,
                     "name": column_date.get("string", ""),
                     "colspan": 1,
                 })
 
-        headers = []
-        if has_previous_period_comparison:
-            headers.append({"name": period_total_header, "colspan": 1})
-        headers.append({"name": "Actual %", "colspan": 1})
-        headers.extend(
+        selected_horizontal_group_id = options.get("selected_horizontal_group_id")
+        header_rows = [[
+            {
+                "name": header["name"],
+                "colspan": header["colspan"],
+                "rowspan": 2 if selected_horizontal_group_id and not header.get("date_key") else 1,
+            }
+            for header in top_headers
+        ]]
+        if selected_horizontal_group_id:
+            horizontal_headers = []
+            for column in options["columns"]:
+                if column["column_group_key"] == period_total_column_group_key:
+                    continue
+                source_column_group_key = actual_percent_column_groups.get(
+                    column["column_group_key"], column["column_group_key"]
+                )
+                column_group = options["column_groups"][source_column_group_key]
+                forced_options = column_group["forced_options"]
+                horizontal_key = tuple(column_group.get("horizontal_groupby_element", ()))
+                if horizontal_key:
+                    label = horizontal_header_names.get(horizontal_key, "Actual")
+                elif forced_options.get("compute_budget") or forced_options.get("budget_percentage"):
+                    label = "Budget"
+                else:
+                    label = "Actual"
+                date_options = forced_options.get("date", {})
+                group_key = (date_options.get("date_from"), date_options.get("date_to"), label)
+                if horizontal_headers and horizontal_headers[-1]["group_key"] == group_key:
+                    horizontal_headers[-1]["colspan"] += 1
+                else:
+                    horizontal_headers.append({
+                        "group_key": group_key,
+                        "name": label,
+                        "colspan": 1,
+                    })
+            header_rows.append([
+                {"name": header["name"], "colspan": header["colspan"], "rowspan": 1}
+                for header in horizontal_headers
+            ])
+
+        options["vhg_notes_header_rows"] = header_rows
+        options["column_headers"] = [[
             {"name": header["name"], "colspan": header["colspan"]}
-            for header in date_headers
-        )
-        options["column_headers"] = [headers]
+            for header in top_headers
+        ]]
+        options["show_horizontal_group_total"] = False
+        options["custom_display_config"].update({
+            "templates": {
+                "AccountReportHeader": "tha_vhg_pnl_ext.NotesReportHeader",
+            },
+            "pdf_export": {
+                "pdf_export_main_table_header": "tha_vhg_pnl_ext.notes_pdf_header",
+            },
+        })
 
     @staticmethod
     def _period_total_header(period_dates):
@@ -326,10 +390,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         companies = self.env["res.company"]
 
         for column_group_key, column_options in report._split_options_per_column_group(options).items():
-            if column_group_key in {
-                options.get("vhg_period_total_column_group_key"),
-                options.get("vhg_actual_percent_column_group_key"),
-            }:
+            if (
+                column_group_key == options.get("vhg_period_total_column_group_key")
+                or column_group_key in options.get("vhg_actual_percent_column_groups", {})
+            ):
                 continue
             query = report._get_report_query(column_options, "strict_range", domain=pnl_domain)
             self.env.cr.execute(SQL(
@@ -382,9 +446,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 result[column_group_key] -= value
         return result
 
-    def _columns(self, report, options, balances, actual_percent=None):
+    def _columns(self, report, options, balances, group_key=None, group_balances=None):
         columns = []
         budget_percentage_column_groups = options.get("vhg_budget_percentage_column_groups", {})
+        actual_percent_column_groups = options.get("vhg_actual_percent_column_groups", {})
         for column in options["columns"]:
             is_period_total = column["expression_label"] == "period_total"
             is_actual_percent = column["expression_label"] == "actual_percent"
@@ -396,7 +461,17 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     for column_group_key in options.get("vhg_period_total_balance_column_group_keys", ())
                 )
             elif is_actual_percent:
-                value = actual_percent
+                source_column_group_key = actual_percent_column_groups.get(column["column_group_key"])
+                value = (
+                    self._actual_percent(
+                        group_key,
+                        balances,
+                        group_balances,
+                        source_column_group_key,
+                    )
+                    if group_key and group_balances and source_column_group_key
+                    else None
+                )
             elif budget_percentage_group_keys:
                 actual_column_group_key, budget_column_group_key = budget_percentage_group_keys
                 budget_base_column = next(
@@ -428,20 +503,16 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             ))
         return columns
 
-    def _actual_percent(self, options, group_key, balances, group_balances):
-        current_column_group_key = options.get("vhg_actual_percent_balance_column_group_key")
-        if not current_column_group_key:
-            return None
-
+    def _actual_percent(self, group_key, balances, group_balances, column_group_key):
         denominator_groups = self._SHARED_PERCENTAGE_GROUPS.get(group_key, (group_key,))
         denominator = sum(
-            group_balances[denominator_group][current_column_group_key]
+            group_balances[denominator_group][column_group_key]
             for denominator_group in denominator_groups
         )
         if not denominator:
             return None
 
-        return balances.get(current_column_group_key, 0.0) * 100.0 / denominator
+        return balances.get(column_group_key, 0.0) * 100.0 / denominator
 
     def _group_line(self, report, options, key, name, balances):
         line_id = report._get_generic_line_id(None, None, markup=f"vhg_pnl_{key}")
@@ -473,7 +544,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 report,
                 options,
                 detail["balances"],
-                actual_percent=self._actual_percent(options, group_key, detail["balances"], group_balances),
+                group_key=group_key,
+                group_balances=group_balances,
             ),
             "caret_options": "account.account",
         }

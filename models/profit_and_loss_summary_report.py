@@ -20,6 +20,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     _OTHER_REVENUE_GROUPS = (
         "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
     )
+    _SUMMARY_OPERATING_EXPENSE_GROUPS = (
+        "cost_of_goods_sold", "operating_cost", "staff_cost", "bonus",
+        "administrative", "repair_maintenance", "sales_marketing",
+    )
 
     def _custom_options_initializer(self, report, options, previous_options):
         selected_date = fields.Date.to_date(options["date"]["date_to"])
@@ -41,10 +45,13 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         for budget in options.get("budgets", []):
             budget["selected"] = budget["id"] in selected_budget_ids
 
-        show_months = previous_options.get("vhg_show_monthly_columns", True)
+        show_months = previous_options.get("vhg_show_monthly_columns", False)
+        previous_month_start = month_start - relativedelta(months=1)
+        previous_month_end = month_start - relativedelta(days=1)
         options.update({
             "vhg_show_monthly_columns": bool(show_months),
             "vhg_summary_month_keys": [],
+            "vhg_summary_fiscal_month_keys": [],
             "vhg_summary_selected_month_key": f"actual_{month_start:%Y_%m}",
             "vhg_summary_ytd_month_keys": [
                 f"actual_{start:%Y_%m}" for start, _end in months if start <= month_start
@@ -52,23 +59,50 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "vhg_summary_budget_id": selected_budget_ids[0] if selected_budget_ids else None,
             "vhg_summary_query_groups": {},
             "vhg_summary_fiscal_label": f"FY {fiscal_start:%b %Y} - {fiscal_end:%b %Y}",
+            "vhg_summary_mtd_label": f"Month to Date - {month_start:%b %Y}",
+            "vhg_summary_ytd_actual_label": f"Year to Date Actual - {fiscal_start:%b} to {month_start:%b %Y}",
+            "vhg_summary_ytd_budget_label": f"Year to Date Budget - {fiscal_start:%b} to {month_start:%b %Y}",
         })
 
         for start, end in months:
             key = f"actual_{start:%Y_%m}"
-            options["vhg_summary_month_keys"].append(key)
+            options["vhg_summary_fiscal_month_keys"].append(key)
             options["vhg_summary_query_groups"][key] = self._query_group(start, end)
+        previous_month_key = f"actual_{previous_month_start:%Y_%m}"
+        if previous_month_key not in options["vhg_summary_query_groups"]:
+            options["vhg_summary_query_groups"][previous_month_key] = self._query_group(
+                previous_month_start, previous_month_end
+            )
         if selected_budget_ids:
             budget_id = selected_budget_ids[0]
             options["vhg_summary_query_groups"]["budget_mtd"] = self._query_group(
                 month_start, month_end, budget_id
             )
-            options["vhg_summary_query_groups"]["budget_fy"] = self._query_group(
-                fiscal_start, fiscal_end, budget_id
+            options["vhg_summary_query_groups"]["budget_ytd"] = self._query_group(
+                fiscal_start, month_end, budget_id
             )
 
+        if show_months:
+            group_balances = self._query_summary_balances(report, options)
+            visible_months = [
+                (start, end)
+                for start, end in months
+                if any(
+                    group_balances[group_key].get(f"actual_{start:%Y_%m}")
+                    for group_key in group_balances
+                )
+            ]
+        else:
+            visible_months = [
+                (previous_month_start, previous_month_end),
+                (month_start, month_end),
+            ]
+        options["vhg_summary_month_keys"] = [
+            f"actual_{start:%Y_%m}" for start, _end in visible_months
+        ]
+
         options["column_groups"] = {"summary": {"forced_options": {}, "forced_domain": []}}
-        options["columns"] = self._display_columns(months if show_months else [])
+        options["columns"] = self._display_columns(visible_months, month_start)
         options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
         options["unfolded_lines"] = []
         options["unfold_all"] = False
@@ -112,9 +146,9 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "sortable": False,
         }
 
-    def _display_columns(self, months):
+    def _display_columns(self, months, selected_month):
         columns = [
-            self._column("Actual", "mtd_actual"),
+            self._column(selected_month.strftime("%b %Y"), "mtd_actual"),
             self._column("%", "mtd_actual_percent", "percentage"),
             self._column("Budget", "mtd_budget"),
             self._column("%", "mtd_budget_percent", "percentage"),
@@ -129,10 +163,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             for start, _end in months
         )
         columns.extend([
-            self._column("Budget", "fy_budget"),
-            self._column("%", "fy_budget_percent", "percentage"),
-            self._column("Variance", "fy_variance"),
-            self._column("%", "fy_variance_percent", "percentage"),
+            self._column("Budget", "ytd_budget"),
+            self._column("%", "ytd_budget_percent", "percentage"),
+            self._column("Variance", "ytd_variance"),
+            self._column("%", "ytd_variance_percent", "percentage"),
         ])
         return columns
 
@@ -147,10 +181,12 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             }
             for key in query_options["column_groups"]
         ]
+        report._init_options_currency_table(query_options, {})
         return super()._query_group_balances(report, query_options)[0]
 
     def _summary_values(self, group_balances):
         values = {key: defaultdict(float, balances) for key, balances in group_balances.items()}
+        values["administrative"] = self._add(values["administrative"], values["taxes"])
         values["total_revenue"] = self._combine(values, additions=self._REVENUE_GROUPS)
         values["net_revenues"] = self._combine(
             values, additions=self._REVENUE_GROUPS, deductions=("direct_cost",)
@@ -161,7 +197,9 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             additions=(*self._REVENUE_GROUPS, *self._OTHER_REVENUE_GROUPS),
             deductions=("direct_cost",),
         )
-        values["total_expenses"] = self._combine(values, additions=self._OPERATING_EXPENSE_GROUPS)
+        values["total_expenses"] = self._combine(
+            values, additions=self._SUMMARY_OPERATING_EXPENSE_GROUPS
+        )
         values["ebitda"] = self._subtract(values["total_net_revenues"], values["total_expenses"])
         values["ebit"] = self._subtract(values["ebitda"], values["depreciation"])
         values["financial_net"] = self._subtract(
@@ -210,26 +248,26 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         ytd_actual_denominator = sum(values[denominator_key][key] for key in ytd_keys)
         has_budget = bool(options.get("vhg_summary_budget_id"))
         mtd_budget = values[row_key]["budget_mtd"] if has_budget else None
-        fy_budget = values[row_key]["budget_fy"] if has_budget else None
+        ytd_budget = values[row_key]["budget_ytd"] if has_budget else None
         mtd_budget_denominator = values[denominator_key]["budget_mtd"] if has_budget else None
-        fy_budget_denominator = values[denominator_key]["budget_fy"] if has_budget else None
-        ytd_variance = mtd_actual - mtd_budget if has_budget else None
-        fy_variance = ytd_actual - fy_budget if has_budget else None
+        ytd_budget_denominator = values[denominator_key]["budget_ytd"] if has_budget else None
+        mtd_variance = mtd_actual - mtd_budget if has_budget else None
+        ytd_variance = ytd_actual - ytd_budget if has_budget else None
 
         data = {
             "mtd_actual": mtd_actual,
             "mtd_actual_percent": self._ratio(mtd_actual, mtd_actual_denominator),
             "mtd_budget": mtd_budget,
             "mtd_budget_percent": self._ratio(mtd_budget, mtd_budget_denominator) if has_budget else None,
-            "mtd_variance": ytd_variance,
-            "mtd_variance_percent": self._ratio(ytd_variance, mtd_budget) if has_budget else None,
+            "mtd_variance": mtd_variance,
+            "mtd_variance_percent": self._ratio(mtd_variance, mtd_budget) if has_budget else None,
             "sequence": sequence,
             "ytd_actual": ytd_actual,
             "ytd_actual_percent": self._ratio(ytd_actual, ytd_actual_denominator),
-            "fy_budget": fy_budget,
-            "fy_budget_percent": self._ratio(fy_budget, fy_budget_denominator) if has_budget else None,
-            "fy_variance": fy_variance,
-            "fy_variance_percent": self._ratio(fy_variance, fy_budget) if has_budget else None,
+            "ytd_budget": ytd_budget,
+            "ytd_budget_percent": self._ratio(ytd_budget, ytd_budget_denominator) if has_budget else None,
+            "ytd_variance": ytd_variance,
+            "ytd_variance_percent": self._ratio(ytd_variance, ytd_budget) if has_budget else None,
         }
         for month_key in options["vhg_summary_month_keys"]:
             data[f"month_{month_key.removeprefix('actual_')}"] = values[row_key][month_key]
@@ -273,7 +311,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             ("rental_complex", group_names["rental_complex"]),
             ("other_revenue", "Other Revenue"),
             ("total_net_revenues", "Total Net Revenues"),
-            *((key, group_names[key]) for key in self._OPERATING_EXPENSE_GROUPS),
+            *((key, group_names[key]) for key in self._SUMMARY_OPERATING_EXPENSE_GROUPS),
             ("total_expenses", "Total Expenses"),
             ("ebitda", "EBITDA"),
             ("depreciation", group_names["depreciation"]),
@@ -291,7 +329,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             *self._REVENUE_GROUPS,
             "direct_cost",
             *self._OTHER_REVENUE_GROUPS,
-            *self._OPERATING_EXPENSE_GROUPS,
+            *self._SUMMARY_OPERATING_EXPENSE_GROUPS,
             "depreciation",
             "financial_net",
             "income_tax",

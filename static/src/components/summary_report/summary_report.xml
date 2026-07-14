@@ -1,5 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
+    <t t-name="tha_vhg_pnl_ext.NotesReportHeader">
+        <thead id="table_header" class="sticky">
+            <t t-foreach="controller.options.vhg_notes_header_rows" t-as="headerRow" t-key="headerRow_index">
+                <tr data-id="column_headers_row">
+                    <th>
+                        <t t-if="headerRow_first and controller.options.companies.length > 1">
+                            <span
+                                class="companies_header"
+                                t-out="controller.options.companies.map(company => company.name).join(', ')"
+                            />
+                        </t>
+                    </th>
+                    <t t-foreach="headerRow" t-as="header" t-key="header_index">
+                        <th
+                            class="column_header"
+                            t-att-colspan="header.colspan || 1"
+                            t-att-rowspan="header.rowspan || 1"
+                        >
+                            <t t-out="header.name"/>
+                        </th>
+                    </t>
+                </tr>
+            </t>
+            <tr data-id="column_subheaders_row">
+                <th/>
+                <t t-foreach="controller.options.columns" t-as="column" t-key="column_index">
+                    <th class="column_header"><t t-out="column.name"/></th>
+                </t>
+            </tr>
+        </thead>
+    </t>
+
     <t t-name="tha_vhg_pnl_ext.SummaryReportFilters" t-inherit="account_reports.AccountReportFiltersCustomizable">
         <xpath expr="//div[@id='filter_rounding_unit']" position="before">
             <button
@@ -16,12 +48,18 @@
         <thead id="table_header" class="sticky">
             <t t-set="monthCount" t-value="controller.options.columns.length - 13"/>
             <tr data-id="column_headers_row">
-                <th class="column_header" colspan="6">Month to Date</th>
+                <th class="column_header" colspan="6">
+                    <t t-out="controller.options.vhg_summary_mtd_label"/>
+                </th>
                 <th class="column_header" rowspan="2">No.</th>
                 <th class="column_header o_vhg_particular" rowspan="2">Particular</th>
-                <th class="column_header" colspan="2">Year to Date</th>
+                <th class="column_header" colspan="2">
+                    <t t-out="controller.options.vhg_summary_ytd_actual_label"/>
+                </th>
                 <th t-if="monthCount" class="column_header" t-att-colspan="monthCount">Monthly Actual</th>
-                <th class="column_header" colspan="4">Full Year</th>
+                <th class="column_header" colspan="4">
+                    <t t-out="controller.options.vhg_summary_ytd_budget_label"/>
+                </th>
             </tr>
             <tr data-id="column_subheaders_row">
                 <t t-foreach="controller.options.columns.slice(0, 6)" t-as="column" t-key="column_index">
