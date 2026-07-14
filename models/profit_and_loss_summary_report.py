@@ -87,14 +87,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         if show_months or hide_zero_months:
             group_balances = self._query_summary_balances(report, options)
         if show_months:
-            months_with_actual = [
-                (start, end) for start, end in months
-                if self._month_has_actual(group_balances, start)
-            ]
-            last_data_month = months_with_actual[-1][0] if months_with_actual else month_start
-            visible_months = [
-                (start, end) for start, end in months if start <= last_data_month
-            ]
+            visible_months = months
         else:
             visible_months = [
                 (previous_month_start, previous_month_end),

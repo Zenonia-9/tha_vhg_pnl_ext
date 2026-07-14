@@ -79,7 +79,8 @@ show_zero_options = report.get_options({
 })
 assert show_zero_options["vhg_hide_zero_monthly_columns"] is False
 assert show_zero_options["vhg_summary_month_keys"] == [
-    "actual_2026_04", "actual_2026_05", "actual_2026_06", "actual_2026_07",
+    f"actual_{year}_{month:02d}"
+    for year, month in [(2026, month) for month in range(4, 13)] + [(2027, month) for month in range(1, 4)]
 ]
 handler = env["tha.vhg.pnl.summary.report.handler"]
 assert not handler._month_has_actual({"test": {"actual_2026_04": 0.0}}, date(2026, 4, 1))
