@@ -226,6 +226,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                         "column_group_key": period_total_column_group_key,
                         "expression_label": "period_total",
                         "sortable": False,
+                        "figure_type": "monetary",
+                        "blank_if_zero": False,
                     })
                 break
 
@@ -374,7 +376,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 value,
                 column,
                 options=options,
-                digits=2 if is_actual_percent else 1,
+                digits=2 if is_period_total or is_actual_percent else 1,
             ))
         return columns
 
