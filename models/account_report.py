@@ -12,7 +12,10 @@ class AccountReport(models.Model):
             "tha_vhg_pnl_ext.report_vhg_profit_and_loss", raise_if_not_found=False
         )
         source_report = self.env.ref("account_reports.profit_and_loss", raise_if_not_found=False)
-        if self != notes_report or not source_report:
+        summary_report = self.env.ref(
+            "tha_vhg_pnl_ext.report_vhg_profit_and_loss_summary", raise_if_not_found=False
+        )
+        if self not in (notes_report, summary_report) or not source_report:
             return
 
         horizontal_groups = source_report.horizontal_group_ids
@@ -46,6 +49,33 @@ class AccountReport(models.Model):
         total_percentage = workbook.add_format({"border": 1, "bold": True, "num_format": "0.00%"})
 
         columns = print_options["columns"]
+        if print_options.get("vhg_summary_horizontal_mode"):
+            sheet.merge_range(0, 0, 1, 0, "No.", header)
+            sheet.merge_range(0, 1, 1, 1, "Particular", header)
+            x_offset = 2
+            for group_header in print_options["vhg_summary_horizontal_headers"]:
+                sheet.merge_range(
+                    0, x_offset, 0, x_offset + group_header.get("colspan", 2) - 1,
+                    group_header["name"], header,
+                )
+                x_offset += group_header.get("colspan", 2)
+            for x, column in enumerate(columns[1:], start=2):
+                sheet.write(1, x, column["name"], header)
+            sheet.set_column(0, len(columns), 14)
+            sheet.set_column(1, 1, 34)
+            for y, line in enumerate(lines, start=2):
+                is_total = line.get("level") == 0
+                values = (
+                    line["columns"][:1]
+                    + [{"no_format": line["name"], "figure_type": "string"}]
+                    + line["columns"][1:]
+                )
+                self._write_vhg_summary_xlsx_row(
+                    sheet, y, values, is_total,
+                    text, total_text, number, total_number, percentage, total_percentage,
+                )
+            return
+
         month_count = len(columns) - 13
         sheet.merge_range(0, 0, 0, 5, print_options["vhg_summary_mtd_label"], header)
         sheet.merge_range(0, 6, 1, 6, "No.", header)
@@ -73,14 +103,24 @@ class AccountReport(models.Model):
         for y, line in enumerate(lines, start=2):
             is_total = line.get("level") == 0
             values = line["columns"][:7] + [{"no_format": line["name"], "figure_type": "string"}] + line["columns"][7:]
-            for x, cell in enumerate(values):
-                value = cell.get("no_format")
-                figure_type = cell.get("figure_type")
-                if figure_type == "percentage" and value is not None:
-                    value /= 100.0
-                    cell_format = total_percentage if is_total else percentage
-                elif isinstance(value, (int, float)):
-                    cell_format = total_number if is_total else number
-                else:
-                    cell_format = total_text if is_total else text
-                sheet.write(y, x, value if value is not None else "", cell_format)
+            self._write_vhg_summary_xlsx_row(
+                sheet, y, values, is_total,
+                text, total_text, number, total_number, percentage, total_percentage,
+            )
+
+    @staticmethod
+    def _write_vhg_summary_xlsx_row(
+        sheet, y, values, is_total,
+        text, total_text, number, total_number, percentage, total_percentage,
+    ):
+        for x, cell in enumerate(values):
+            value = cell.get("no_format")
+            figure_type = cell.get("figure_type")
+            if figure_type == "percentage" and value is not None:
+                value /= 100.0
+                cell_format = total_percentage if is_total else percentage
+            elif isinstance(value, (int, float)):
+                cell_format = total_number if is_total else number
+            else:
+                cell_format = total_text if is_total else text
+            sheet.write(y, x, value if value is not None else "", cell_format)

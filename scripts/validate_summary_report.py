@@ -1,4 +1,14 @@
 from datetime import date
+from io import BytesIO
+from zipfile import ZipFile
+
+
+def column_name(number):
+    name = ""
+    while number:
+        number, remainder = divmod(number - 1, 26)
+        name = chr(65 + remainder) + name
+    return name
 
 
 company = env["res.company"].search([
@@ -104,10 +114,54 @@ assert shown_zero_options["vhg_summary_month_keys"] == [
     "actual_2099_06", "actual_2099_07",
 ]
 
+horizontal_group = env.ref("account_reports.profit_and_loss").horizontal_group_ids[:1]
+assert horizontal_group, "No Profit and Loss horizontal group is configured"
+other_company_ids = env["res.company"].search([("id", "!=", company.id)]).ids
+consolidated_report = report.with_context(
+    allowed_company_ids=[company.id, *other_company_ids]
+)
+multi_company_options = consolidated_report.get_options(base_previous)
+assert multi_company_options["vhg_summary_horizontal_mode"] is False
+assert consolidated_report._get_lines(multi_company_options)
+horizontal_options = consolidated_report.get_options({
+    **budget_previous,
+    "selected_horizontal_group_id": horizontal_group.id,
+})
+horizontal_lines = consolidated_report._get_lines(horizontal_options)
+entities = horizontal_options["vhg_summary_horizontal_entities"]
+assert horizontal_options["vhg_summary_horizontal_mode"] is True
+assert horizontal_options["selected_horizontal_group_id"] == horizontal_group.id
+assert entities
+assert len(horizontal_options["columns"]) == 1 + (2 * len(entities)) + 6
+assert [column["name"] for column in horizontal_options["columns"][:3]] == [
+    "No.", horizontal_options["vhg_summary_horizontal_period_label"], "%",
+]
+assert len(horizontal_lines) == 26
+assert all(not line.get("unfoldable") for line in horizontal_lines)
+consolidated_index = 1 + (2 * len(entities))
+for line in horizontal_lines:
+    entity_total = sum(
+        line["columns"][1 + (2 * index)]["no_format"] or 0.0
+        for index in range(len(entities))
+    )
+    assert abs(line["columns"][consolidated_index]["no_format"] - entity_total) < 0.01
+
+horizontal_xlsx = consolidated_report.export_to_xlsx(horizontal_options)
+assert len(horizontal_xlsx["file_content"]) > 1000
+with ZipFile(BytesIO(horizontal_xlsx["file_content"])) as workbook:
+    worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
+    assert b'A1:A2' in worksheet_xml
+    assert b'B1:B2' in worksheet_xml
+    for index in range(len(horizontal_options["vhg_summary_horizontal_headers"])):
+        start = 3 + (2 * index)
+        end = start + 1
+        merged_range = f"{column_name(start)}1:{column_name(end)}1".encode()
+        assert merged_range in worksheet_xml, merged_range
+horizontal_pdf = consolidated_report.export_to_pdf(horizontal_options)
+assert len(horizontal_pdf["file_content"]) > 1000
+
 xlsx = report.export_to_xlsx(budget_options)
 assert len(xlsx["file_content"]) > 1000
-from io import BytesIO
-from zipfile import ZipFile
 with ZipFile(BytesIO(xlsx["file_content"])) as workbook:
     worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
     for merged_range in (b'A1:F1', b'G1:G2', b'H1:H2', b'I1:J1', b'K1:L1', b'M1:P1'):

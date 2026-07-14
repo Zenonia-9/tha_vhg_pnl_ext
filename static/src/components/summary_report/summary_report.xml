@@ -34,65 +34,92 @@
 
     <t t-name="tha_vhg_pnl_ext.SummaryReportFilters" t-inherit="account_reports.AccountReportFiltersCustomizable">
         <xpath expr="//div[@id='filter_rounding_unit']" position="before">
-            <button
-                class="btn btn-secondary"
-                t-att-class="{ 'active': controller.cachedFilterOptions.vhg_show_monthly_columns }"
-                t-on-click="toggleMonthlyColumns"
-            >
-                <i class="fa fa-calendar me-1"/>Show Monthly Columns
-            </button>
-            <button
-                class="btn btn-secondary"
-                t-att-class="{ 'active': controller.cachedFilterOptions.vhg_hide_zero_monthly_columns }"
-                t-on-click="toggleZeroMonthlyColumns"
-            >
-                <i class="fa fa-eye-slash me-1"/>
-                <t t-if="controller.cachedFilterOptions.vhg_hide_zero_monthly_columns">
-                    Show Zero Months
-                </t>
-                <t t-else="">
-                    Hide Zero Months
-                </t>
-            </button>
+            <t t-if="!controller.cachedFilterOptions.vhg_summary_horizontal_mode">
+                <button
+                    class="btn btn-secondary"
+                    t-att-class="{ 'active': controller.cachedFilterOptions.vhg_show_monthly_columns }"
+                    t-on-click="toggleMonthlyColumns"
+                >
+                    <i class="fa fa-calendar me-1"/>Show Monthly Columns
+                </button>
+                <button
+                    class="btn btn-secondary"
+                    t-att-class="{ 'active': controller.cachedFilterOptions.vhg_hide_zero_monthly_columns }"
+                    t-on-click="toggleZeroMonthlyColumns"
+                >
+                    <i class="fa fa-eye-slash me-1"/>
+                    <t t-if="controller.cachedFilterOptions.vhg_hide_zero_monthly_columns">
+                        Show Zero Months
+                    </t>
+                    <t t-else="">
+                        Hide Zero Months
+                    </t>
+                </button>
+            </t>
         </xpath>
     </t>
 
     <t t-name="tha_vhg_pnl_ext.SummaryReportHeader">
         <thead id="table_header" class="sticky">
-            <t t-set="monthCount" t-value="controller.options.columns.length - 13"/>
-            <tr data-id="column_headers_row">
-                <th class="column_header" colspan="6">
-                    <t t-out="controller.options.vhg_summary_mtd_label"/>
-                </th>
-                <th class="column_header" rowspan="2">No.</th>
-                <th class="column_header o_vhg_particular" rowspan="2">Particular</th>
-                <th class="column_header" colspan="2">
-                    <t t-out="controller.options.vhg_summary_ytd_actual_label"/>
-                </th>
-                <th t-if="monthCount" class="column_header" t-att-colspan="monthCount">Monthly Actual</th>
-                <th class="column_header" colspan="4">
-                    <t t-out="controller.options.vhg_summary_ytd_budget_label"/>
-                </th>
-            </tr>
-            <tr data-id="column_subheaders_row">
-                <t t-foreach="controller.options.columns.slice(0, 6)" t-as="column" t-key="column_index">
-                    <th class="column_header"><t t-out="column.name"/></th>
-                </t>
-                <t t-foreach="controller.options.columns.slice(7)" t-as="column" t-key="column_index">
-                    <th class="column_header"><t t-out="column.name"/></th>
-                </t>
-            </tr>
+            <t t-if="controller.options.vhg_summary_horizontal_mode">
+                <tr data-id="column_headers_row">
+                    <th class="column_header" rowspan="2">No.</th>
+                    <th class="column_header o_vhg_particular" rowspan="2">Particular</th>
+                    <t t-foreach="controller.options.vhg_summary_horizontal_headers" t-as="header" t-key="header_index">
+                        <th class="column_header" t-att-colspan="header.colspan"><t t-out="header.name"/></th>
+                    </t>
+                </tr>
+                <tr data-id="column_subheaders_row">
+                    <t t-foreach="controller.options.columns.slice(1)" t-as="column" t-key="column_index">
+                        <th class="column_header"><t t-out="column.name"/></th>
+                    </t>
+                </tr>
+            </t>
+            <t t-else="">
+                <t t-set="monthCount" t-value="controller.options.columns.length - 13"/>
+                <tr data-id="column_headers_row">
+                    <th class="column_header" colspan="6">
+                        <t t-out="controller.options.vhg_summary_mtd_label"/>
+                    </th>
+                    <th class="column_header" rowspan="2">No.</th>
+                    <th class="column_header o_vhg_particular" rowspan="2">Particular</th>
+                    <th class="column_header" colspan="2">
+                        <t t-out="controller.options.vhg_summary_ytd_actual_label"/>
+                    </th>
+                    <th t-if="monthCount" class="column_header" t-att-colspan="monthCount">Monthly Actual</th>
+                    <th class="column_header" colspan="4">
+                        <t t-out="controller.options.vhg_summary_ytd_budget_label"/>
+                    </th>
+                </tr>
+                <tr data-id="column_subheaders_row">
+                    <t t-foreach="controller.options.columns.slice(0, 6)" t-as="column" t-key="column_index">
+                        <th class="column_header"><t t-out="column.name"/></th>
+                    </t>
+                    <t t-foreach="controller.options.columns.slice(7)" t-as="column" t-key="column_index">
+                        <th class="column_header"><t t-out="column.name"/></th>
+                    </t>
+                </tr>
+            </t>
         </thead>
     </t>
 
     <t t-name="tha_vhg_pnl_ext.SummaryReportLine">
         <tr data-id="line" t-att-class="lineClasses">
-            <t t-foreach="props.line.columns.slice(0, 7)" t-as="cell" t-key="cell_index">
-                <t t-component="env.component('AccountReportLineCell')" t-props="{ line: props.line, cell: cell }"/>
+            <t t-if="controller.options.vhg_summary_horizontal_mode">
+                <t t-component="env.component('AccountReportLineCell')" t-props="{ line: props.line, cell: props.line.columns[0] }"/>
+                <t t-component="env.component('AccountReportLineName')" t-props="{ lineIndex: props.lineIndex, line: props.line }"/>
+                <t t-foreach="props.line.columns.slice(1)" t-as="cell" t-key="cell_index">
+                    <t t-component="env.component('AccountReportLineCell')" t-props="{ line: props.line, cell: cell }"/>
+                </t>
             </t>
-            <t t-component="env.component('AccountReportLineName')" t-props="{ lineIndex: props.lineIndex, line: props.line }"/>
-            <t t-foreach="props.line.columns.slice(7)" t-as="cell" t-key="cell_index">
-                <t t-component="env.component('AccountReportLineCell')" t-props="{ line: props.line, cell: cell }"/>
+            <t t-else="">
+                <t t-foreach="props.line.columns.slice(0, 7)" t-as="cell" t-key="cell_index">
+                    <t t-component="env.component('AccountReportLineCell')" t-props="{ line: props.line, cell: cell }"/>
+                </t>
+                <t t-component="env.component('AccountReportLineName')" t-props="{ lineIndex: props.lineIndex, line: props.line }"/>
+                <t t-foreach="props.line.columns.slice(7)" t-as="cell" t-key="cell_index">
+                    <t t-component="env.component('AccountReportLineCell')" t-props="{ line: props.line, cell: cell }"/>
+                </t>
             </t>
         </tr>
     </t>

@@ -26,34 +26,60 @@
 
     <template id="summary_pdf_header">
         <thead>
-            <tr>
-                <th colspan="6"><t t-out="options['vhg_summary_mtd_label']"/></th>
-                <th rowspan="2">No.</th>
-                <th rowspan="2">Particular</th>
-                <th colspan="2"><t t-out="options['vhg_summary_ytd_actual_label']"/></th>
-                <th t-if="len(options['columns']) &gt; 13" t-att-colspan="len(options['columns']) - 13">Monthly Actual</th>
-                <th colspan="4"><t t-out="options['vhg_summary_ytd_budget_label']"/></th>
-            </tr>
-            <tr>
-                <t t-foreach="options['columns'][:6]" t-as="column">
-                    <th><t t-out="column['name']"/></th>
-                </t>
-                <t t-foreach="options['columns'][7:]" t-as="column">
-                    <th><t t-out="column['name']"/></th>
-                </t>
-            </tr>
+            <t t-if="options.get('vhg_summary_horizontal_mode')">
+                <tr>
+                    <th rowspan="2">No.</th>
+                    <th rowspan="2">Particular</th>
+                    <t t-foreach="options['vhg_summary_horizontal_headers']" t-as="header">
+                        <th t-att-colspan="header.get('colspan', 2)"><t t-out="header['name']"/></th>
+                    </t>
+                </tr>
+                <tr>
+                    <t t-foreach="options['columns'][1:]" t-as="column">
+                        <th><t t-out="column['name']"/></th>
+                    </t>
+                </tr>
+            </t>
+            <t t-else="">
+                <tr>
+                    <th colspan="6"><t t-out="options['vhg_summary_mtd_label']"/></th>
+                    <th rowspan="2">No.</th>
+                    <th rowspan="2">Particular</th>
+                    <th colspan="2"><t t-out="options['vhg_summary_ytd_actual_label']"/></th>
+                    <th t-if="len(options['columns']) &gt; 13" t-att-colspan="len(options['columns']) - 13">Monthly Actual</th>
+                    <th colspan="4"><t t-out="options['vhg_summary_ytd_budget_label']"/></th>
+                </tr>
+                <tr>
+                    <t t-foreach="options['columns'][:6]" t-as="column">
+                        <th><t t-out="column['name']"/></th>
+                    </t>
+                    <t t-foreach="options['columns'][7:]" t-as="column">
+                        <th><t t-out="column['name']"/></th>
+                    </t>
+                </tr>
+            </t>
         </thead>
     </template>
 
     <template id="summary_pdf_body">
         <t t-foreach="lines" t-as="line">
             <tr t-att-class="'o_fw_bold' if line.get('level') == 0 else ''">
-                <t t-foreach="line['columns'][:7]" t-as="cell">
+                <t t-if="options.get('vhg_summary_horizontal_mode')">
+                    <t t-set="cell" t-value="line['columns'][0]"/>
                     <td class="o_cell_td"><t t-call="account_reports.pdf_export_cell"/></td>
+                    <td class="o_line_name_level"><t t-out="line['name']"/></td>
+                    <t t-foreach="line['columns'][1:]" t-as="cell">
+                        <td class="o_cell_td"><t t-call="account_reports.pdf_export_cell"/></td>
+                    </t>
                 </t>
-                <td class="o_line_name_level"><t t-out="line['name']"/></td>
-                <t t-foreach="line['columns'][7:]" t-as="cell">
-                    <td class="o_cell_td"><t t-call="account_reports.pdf_export_cell"/></td>
+                <t t-else="">
+                    <t t-foreach="line['columns'][:7]" t-as="cell">
+                        <td class="o_cell_td"><t t-call="account_reports.pdf_export_cell"/></td>
+                    </t>
+                    <td class="o_line_name_level"><t t-out="line['name']"/></td>
+                    <t t-foreach="line['columns'][7:]" t-as="cell">
+                        <td class="o_cell_td"><t t-call="account_reports.pdf_export_cell"/></td>
+                    </t>
                 </t>
             </tr>
         </t>

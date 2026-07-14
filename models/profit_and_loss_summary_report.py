@@ -26,6 +26,8 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     )
 
     def _custom_options_initializer(self, report, options, previous_options):
+        horizontal_mode = bool(options.get("selected_horizontal_group_id"))
+        horizontal_entities = self._horizontal_entities(options) if horizontal_mode else []
         selected_date = fields.Date.to_date(options["date"]["date_to"])
         month_start = selected_date.replace(day=1)
         month_end = month_start + relativedelta(months=1, days=-1)
@@ -60,53 +62,80 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             ],
             "vhg_summary_budget_id": selected_budget_ids[0] if selected_budget_ids else None,
             "vhg_summary_query_groups": {},
+            "vhg_summary_horizontal_mode": horizontal_mode,
+            "vhg_summary_horizontal_entities": horizontal_entities,
             "vhg_summary_fiscal_label": f"FY {fiscal_start:%b %Y} - {fiscal_end:%b %Y}",
             "vhg_summary_mtd_label": f"Month to Date - {month_start:%b %Y}",
             "vhg_summary_ytd_actual_label": f"Year to Date Actual - {fiscal_start:%b} to {month_start:%b %Y}",
             "vhg_summary_ytd_budget_label": f"Year to Date Budget - {fiscal_start:%b} to {month_start:%b %Y}",
         })
 
-        for start, end in months:
-            key = f"actual_{start:%Y_%m}"
-            options["vhg_summary_fiscal_month_keys"].append(key)
-            options["vhg_summary_query_groups"][key] = self._query_group(start, end)
-        previous_month_key = f"actual_{previous_month_start:%Y_%m}"
-        if previous_month_key not in options["vhg_summary_query_groups"]:
-            options["vhg_summary_query_groups"][previous_month_key] = self._query_group(
-                previous_month_start, previous_month_end
-            )
-        if selected_budget_ids:
-            budget_id = selected_budget_ids[0]
-            options["vhg_summary_query_groups"]["budget_mtd"] = self._query_group(
-                month_start, month_end, budget_id
-            )
-            options["vhg_summary_query_groups"]["budget_ytd"] = self._query_group(
-                fiscal_start, month_end, budget_id
-            )
-
-        if show_months or hide_zero_months:
-            group_balances = self._query_summary_balances(report, options)
-        if show_months:
-            visible_months = months
+        if horizontal_mode:
+            period_label = f"{fiscal_start:%b-%y} to {month_start:%b-%y}"
+            for entity in horizontal_entities:
+                options["vhg_summary_query_groups"][entity["query_key"]] = self._query_group(
+                    fiscal_start, month_end, forced_domain=entity["forced_domain"]
+                )
+            if selected_budget_ids:
+                options["vhg_summary_query_groups"]["budget_ytd"] = self._query_group(
+                    fiscal_start, month_end, selected_budget_ids[0]
+                )
+            options["vhg_summary_horizontal_period_label"] = period_label
+            options["vhg_summary_horizontal_headers"] = [
+                {"name": entity["name"], "colspan": 2}
+                for entity in horizontal_entities
+            ] + [
+                {"name": f"Conso ({period_label})", "colspan": 2},
+                {"name": "Budget", "colspan": 2},
+                {"name": "Variance", "colspan": 2},
+            ]
+            options["column_groups"] = {"summary": {"forced_options": {}, "forced_domain": []}}
+            options["columns"] = self._horizontal_display_columns(horizontal_entities, period_label)
+            options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
         else:
-            visible_months = [
-                (previous_month_start, previous_month_end),
-                (month_start, month_end),
-            ]
-        if hide_zero_months:
-            visible_months = [
-                (start, end) for start, end in visible_months
-                if self._month_has_actual(group_balances, start)
-            ]
-        options["vhg_summary_month_keys"] = [
-            f"actual_{start:%Y_%m}" for start, _end in visible_months
-        ]
+            for start, end in months:
+                key = f"actual_{start:%Y_%m}"
+                options["vhg_summary_fiscal_month_keys"].append(key)
+                options["vhg_summary_query_groups"][key] = self._query_group(start, end)
+            previous_month_key = f"actual_{previous_month_start:%Y_%m}"
+            if previous_month_key not in options["vhg_summary_query_groups"]:
+                options["vhg_summary_query_groups"][previous_month_key] = self._query_group(
+                    previous_month_start, previous_month_end
+                )
+            if selected_budget_ids:
+                budget_id = selected_budget_ids[0]
+                options["vhg_summary_query_groups"]["budget_mtd"] = self._query_group(
+                    month_start, month_end, budget_id
+                )
+                options["vhg_summary_query_groups"]["budget_ytd"] = self._query_group(
+                    fiscal_start, month_end, budget_id
+                )
 
-        options["column_groups"] = {"summary": {"forced_options": {}, "forced_domain": []}}
-        options["columns"] = self._display_columns(visible_months, month_start)
-        options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
+            if show_months or hide_zero_months:
+                group_balances = self._query_summary_balances(report, options)
+            if show_months:
+                visible_months = months
+            else:
+                visible_months = [
+                    (previous_month_start, previous_month_end),
+                    (month_start, month_end),
+                ]
+            if hide_zero_months:
+                visible_months = [
+                    (start, end) for start, end in visible_months
+                    if self._month_has_actual(group_balances, start)
+                ]
+            options["vhg_summary_month_keys"] = [
+                f"actual_{start:%Y_%m}" for start, _end in visible_months
+            ]
+
+            options["column_groups"] = {"summary": {"forced_options": {}, "forced_domain": []}}
+            options["columns"] = self._display_columns(visible_months, month_start)
+            options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
+
         options["unfolded_lines"] = []
         options["unfold_all"] = False
+        options["show_horizontal_group_total"] = False
         options["custom_display_config"].update({
             "templates": {
                 "AccountReportFilters": "tha_vhg_pnl_ext.SummaryReportFilters",
@@ -121,6 +150,33 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "css_custom_class": "o_vhg_pnl_summary",
         })
 
+    def _horizontal_entities(self, options):
+        entities = []
+        seen = set()
+        horizontal_group = self.env["account.report.horizontal.group"].browse(
+            options["selected_horizontal_group_id"]
+        )
+        field_order = horizontal_group.rule_ids.mapped("field_name")
+        for column in options.get("columns", []):
+            column_group = options.get("column_groups", {}).get(column["column_group_key"], {})
+            element = tuple(column_group.get("horizontal_groupby_element", ()))
+            if not element or element in seen:
+                continue
+            seen.add(element)
+            element_values = dict(element)
+            names = []
+            for field_name in field_order:
+                record_id = element_values.get(field_name)
+                field = self.env["account.move.line"]._fields[field_name]
+                record = self.env[field.comodel_name].browse(record_id)
+                names.append(record.display_name)
+            entities.append({
+                "name": " / ".join(names),
+                "query_key": f"horizontal_{len(entities)}",
+                "forced_domain": list(column_group.get("forced_domain", [])),
+            })
+        return entities
+
     @staticmethod
     def _month_has_actual(group_balances, month_start):
         month_key = f"actual_{month_start:%Y_%m}"
@@ -130,7 +186,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         )
 
     @staticmethod
-    def _query_group(date_from, date_to, budget_id=None):
+    def _query_group(date_from, date_to, budget_id=None, forced_domain=None):
         forced_options = {
             "date": {
                 "date_from": fields.Date.to_string(date_from),
@@ -143,7 +199,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         }
         if budget_id:
             forced_options["compute_budget"] = budget_id
-        return {"forced_options": forced_options, "forced_domain": []}
+        return {"forced_options": forced_options, "forced_domain": forced_domain or []}
 
     @staticmethod
     def _column(name, label, figure_type="monetary"):
@@ -179,6 +235,23 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         ])
         return columns
 
+    def _horizontal_display_columns(self, entities, period_label):
+        columns = [self._column("No.", "sequence", "string")]
+        for index, _entity in enumerate(entities):
+            columns.extend([
+                self._column(period_label, f"horizontal_{index}_actual"),
+                self._column("%", f"horizontal_{index}_percent", "percentage"),
+            ])
+        columns.extend([
+            self._column("Total", "consolidated_actual"),
+            self._column("%", "consolidated_percent", "percentage"),
+            self._column(period_label, "ytd_budget"),
+            self._column("%", "ytd_budget_percent", "percentage"),
+            self._column("Amount", "ytd_variance"),
+            self._column("%", "ytd_variance_percent", "percentage"),
+        ])
+        return columns
+
     def _query_summary_balances(self, report, options):
         query_options = dict(options)
         query_options["column_groups"] = options["vhg_summary_query_groups"]
@@ -191,6 +264,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             for key in query_options["column_groups"]
         ]
         report._init_options_currency_table(query_options, {})
+        report._init_currency_table(query_options)
         return super()._query_group_balances(report, query_options)[0]
 
     def _summary_values(self, group_balances):
@@ -248,6 +322,9 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         return value * 100.0 / denominator if denominator else None
 
     def _line_columns(self, report, options, row_key, values, sequence):
+        if options.get("vhg_summary_horizontal_mode"):
+            return self._horizontal_line_columns(report, options, row_key, values, sequence)
+
         selected_key = options["vhg_summary_selected_month_key"]
         ytd_keys = options["vhg_summary_ytd_month_keys"]
         denominator_key = self._percentage_denominator(row_key)
@@ -291,6 +368,44 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 digits=2 if column["figure_type"] == "percentage" else 1,
             ))
         return columns
+
+    def _horizontal_line_columns(self, report, options, row_key, values, sequence):
+        denominator_key = self._percentage_denominator(row_key)
+        data = {"sequence": sequence}
+        consolidated_actual = 0.0
+        consolidated_denominator = 0.0
+        for index, entity in enumerate(options["vhg_summary_horizontal_entities"]):
+            query_key = entity["query_key"]
+            actual = values[row_key][query_key]
+            denominator = values[denominator_key][query_key]
+            data[f"horizontal_{index}_actual"] = actual
+            data[f"horizontal_{index}_percent"] = self._ratio(actual, denominator)
+            consolidated_actual += actual
+            consolidated_denominator += denominator
+
+        has_budget = bool(options.get("vhg_summary_budget_id"))
+        budget = values[row_key]["budget_ytd"] if has_budget else None
+        budget_denominator = values[denominator_key]["budget_ytd"] if has_budget else None
+        variance = consolidated_actual - budget if has_budget else None
+        data.update({
+            "consolidated_actual": consolidated_actual,
+            "consolidated_percent": self._ratio(
+                consolidated_actual, consolidated_denominator
+            ),
+            "ytd_budget": budget,
+            "ytd_budget_percent": self._ratio(budget, budget_denominator) if has_budget else None,
+            "ytd_variance": variance,
+            "ytd_variance_percent": self._ratio(variance, budget) if has_budget else None,
+        })
+        return [
+            report._build_column_dict(
+                data.get(column["expression_label"]),
+                column,
+                options=options,
+                digits=2 if column["figure_type"] == "percentage" else 1,
+            )
+            for column in options["columns"]
+        ]
 
     def _dynamic_lines_generator(self, report, options, all_column_groups_expression_totals, warnings=None):
         group_balances = self._query_summary_balances(report, options)
