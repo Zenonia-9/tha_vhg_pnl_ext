@@ -46,10 +46,12 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             budget["selected"] = budget["id"] in selected_budget_ids
 
         show_months = previous_options.get("vhg_show_monthly_columns", False)
+        hide_zero_months = previous_options.get("vhg_hide_zero_monthly_columns", True)
         previous_month_start = month_start - relativedelta(months=1)
         previous_month_end = month_start - relativedelta(days=1)
         options.update({
             "vhg_show_monthly_columns": bool(show_months),
+            "vhg_hide_zero_monthly_columns": bool(hide_zero_months),
             "vhg_summary_month_keys": [],
             "vhg_summary_fiscal_month_keys": [],
             "vhg_summary_selected_month_key": f"actual_{month_start:%Y_%m}",
@@ -82,20 +84,26 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 fiscal_start, month_end, budget_id
             )
 
-        if show_months:
+        if show_months or hide_zero_months:
             group_balances = self._query_summary_balances(report, options)
+        if show_months:
+            months_with_actual = [
+                (start, end) for start, end in months
+                if self._month_has_actual(group_balances, start)
+            ]
+            last_data_month = months_with_actual[-1][0] if months_with_actual else month_start
             visible_months = [
-                (start, end)
-                for start, end in months
-                if any(
-                    group_balances[group_key].get(f"actual_{start:%Y_%m}")
-                    for group_key in group_balances
-                )
+                (start, end) for start, end in months if start <= last_data_month
             ]
         else:
             visible_months = [
                 (previous_month_start, previous_month_end),
                 (month_start, month_end),
+            ]
+        if hide_zero_months:
+            visible_months = [
+                (start, end) for start, end in visible_months
+                if self._month_has_actual(group_balances, start)
             ]
         options["vhg_summary_month_keys"] = [
             f"actual_{start:%Y_%m}" for start, _end in visible_months
@@ -119,6 +127,14 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             },
             "css_custom_class": "o_vhg_pnl_summary",
         })
+
+    @staticmethod
+    def _month_has_actual(group_balances, month_start):
+        month_key = f"actual_{month_start:%Y_%m}"
+        return any(
+            balances.get(month_key)
+            for balances in group_balances.values()
+        )
 
     @staticmethod
     def _query_group(date_from, date_to, budget_id=None):

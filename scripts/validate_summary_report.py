@@ -1,3 +1,6 @@
+from datetime import date
+
+
 company = env["res.company"].search([
     ("name", "ilike", "THUKHA SAYTANAR CO. Ltd"),
 ], limit=1)
@@ -23,7 +26,7 @@ base_previous = {
 }
 no_budget_options = report.get_options(base_previous)
 no_budget_lines = report._get_lines(no_budget_options)
-assert "vhg_hide_zero_months" not in no_budget_options
+assert no_budget_options["vhg_hide_zero_monthly_columns"] is True
 assert [column["name"] for column in no_budget_options["columns"][:9]] == [
     "Jul 2026", "%", "Budget", "%", "Variance", "%", "No.", "Actual", "%",
 ]
@@ -68,6 +71,36 @@ expanded_options = report.get_options({
 })
 assert expanded_options["vhg_summary_month_keys"] == [
     "actual_2026_04", "actual_2026_05", "actual_2026_06", "actual_2026_07",
+]
+show_zero_options = report.get_options({
+    **budget_previous,
+    "vhg_show_monthly_columns": True,
+    "vhg_hide_zero_monthly_columns": False,
+})
+assert show_zero_options["vhg_hide_zero_monthly_columns"] is False
+assert show_zero_options["vhg_summary_month_keys"] == [
+    "actual_2026_04", "actual_2026_05", "actual_2026_06", "actual_2026_07",
+]
+handler = env["tha.vhg.pnl.summary.report.handler"]
+assert not handler._month_has_actual({"test": {"actual_2026_04": 0.0}}, date(2026, 4, 1))
+assert handler._month_has_actual({"test": {"actual_2026_04": 1.0}}, date(2026, 4, 1))
+
+zero_period = {
+    "date": {
+        "date_from": "2099-07-01",
+        "date_to": "2099-07-31",
+        "filter": "custom",
+        "mode": "range",
+    },
+}
+hidden_zero_options = report.get_options(zero_period)
+assert hidden_zero_options["vhg_summary_month_keys"] == []
+shown_zero_options = report.get_options({
+    **zero_period,
+    "vhg_hide_zero_monthly_columns": False,
+})
+assert shown_zero_options["vhg_summary_month_keys"] == [
+    "actual_2099_06", "actual_2099_07",
 ]
 
 xlsx = report.export_to_xlsx(budget_options)

@@ -14,6 +14,13 @@ export class VhgPnlSummaryFilters extends AccountReportFilters {
         });
     }
 
+    async toggleZeroMonthlyColumns() {
+        await this.filterClicked({
+            optionKey: "vhg_hide_zero_monthly_columns",
+            reload: true,
+        });
+    }
+
     selectBudget(budget) {
         const selectBudget = !budget.selected;
         for (const candidate of this.controller.cachedFilterOptions.budgets) {

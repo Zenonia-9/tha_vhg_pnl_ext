@@ -41,6 +41,19 @@
             >
                 <i class="fa fa-calendar me-1"/>Show Monthly Columns
             </button>
+            <button
+                class="btn btn-secondary"
+                t-att-class="{ 'active': controller.cachedFilterOptions.vhg_hide_zero_monthly_columns }"
+                t-on-click="toggleZeroMonthlyColumns"
+            >
+                <i class="fa fa-eye-slash me-1"/>
+                <t t-if="controller.cachedFilterOptions.vhg_hide_zero_monthly_columns">
+                    Show Zero Months
+                </t>
+                <t t-else="">
+                    Hide Zero Months
+                </t>
+            </button>
         </xpath>
     </t>
 
