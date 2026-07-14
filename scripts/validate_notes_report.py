@@ -44,9 +44,15 @@ unfolded_options = report.get_options({
 unfolded_options["unfold_all"] = True
 unfolded_lines = report._get_lines(unfolded_options)
 bone_dxa = next(line for line in unfolded_lines if line["name"] == "500010 Bone Dxa Income")
-expected_budget_percentage = bone_dxa["columns"][2]["no_format"] * 100.0 / bone_dxa["columns"][3]["no_format"]
-assert abs(bone_dxa["columns"][4]["no_format"] - expected_budget_percentage) < 0.000001
-assert bone_dxa["columns"][4]["name"].endswith("%")
+expected_budget_percentage = report._compute_column_percent_comparison_data(
+    unfolded_options,
+    bone_dxa["columns"][2]["no_format"],
+    bone_dxa["columns"][3]["no_format"],
+    green_on_positive=bone_dxa["columns"][2]["green_on_positive"],
+)
+assert bone_dxa["columns"][4]["name"] == expected_budget_percentage["name"]
+assert bone_dxa["columns"][4]["comparison_mode"] == expected_budget_percentage["mode"]
+assert bone_dxa["columns"][4]["figure_type"] == "string"
 
 xlsx = report.export_to_xlsx(options)
 pdf = report.export_to_pdf(options)

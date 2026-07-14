@@ -384,10 +384,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
     def _columns(self, report, options, balances, actual_percent=None):
         columns = []
+        budget_percentage_column_groups = options.get("vhg_budget_percentage_column_groups", {})
         for column in options["columns"]:
             is_period_total = column["expression_label"] == "period_total"
             is_actual_percent = column["expression_label"] == "actual_percent"
-            budget_percentage_column_groups = options.get("vhg_budget_percentage_column_groups", {})
             budget_percentage_group_keys = budget_percentage_column_groups.get(column["column_group_key"])
             value = balances.get(column["column_group_key"], 0.0)
             if is_period_total:
@@ -399,17 +399,32 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 value = actual_percent
             elif budget_percentage_group_keys:
                 actual_column_group_key, budget_column_group_key = budget_percentage_group_keys
-                budget_value = balances.get(budget_column_group_key, 0.0)
-                value = (
-                    balances.get(actual_column_group_key, 0.0) * 100.0 / budget_value
-                    if budget_value
-                    else None
+                budget_base_column = next(
+                    other_column
+                    for other_column in options["columns"]
+                    if other_column["column_group_key"] == actual_column_group_key
                 )
+                comparison = report._compute_column_percent_comparison_data(
+                    options,
+                    balances.get(actual_column_group_key, 0.0),
+                    balances.get(budget_column_group_key, 0.0),
+                    green_on_positive=budget_base_column.get("green_on_positive", False),
+                )
+                columns.append(report._build_column_dict(
+                    comparison["name"],
+                    {
+                        **column,
+                        "figure_type": "string",
+                        "comparison_mode": comparison["mode"],
+                    },
+                    options=options,
+                ))
+                continue
             columns.append(report._build_column_dict(
                 value,
                 column,
                 options=options,
-                digits=2 if is_period_total or is_actual_percent or budget_percentage_group_keys else 1,
+                digits=2 if is_period_total or is_actual_percent else 1,
             ))
         return columns
 
