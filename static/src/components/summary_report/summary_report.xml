@@ -34,28 +34,26 @@
 
     <t t-name="tha_vhg_pnl_ext.SummaryReportFilters" t-inherit="account_reports.AccountReportFiltersCustomizable">
         <xpath expr="//div[@id='filter_rounding_unit']" position="before">
-            <t t-if="!controller.cachedFilterOptions.vhg_summary_horizontal_mode">
-                <button
-                    class="btn btn-secondary"
-                    t-att-class="{ 'active': controller.cachedFilterOptions.vhg_show_monthly_columns }"
-                    t-on-click="toggleMonthlyColumns"
-                >
-                    <i class="fa fa-calendar me-1"/>Show Monthly Columns
-                </button>
-                <button
-                    class="btn btn-secondary"
-                    t-att-class="{ 'active': controller.cachedFilterOptions.vhg_hide_zero_monthly_columns }"
-                    t-on-click="toggleZeroMonthlyColumns"
-                >
-                    <i class="fa fa-eye-slash me-1"/>
-                    <t t-if="controller.cachedFilterOptions.vhg_hide_zero_monthly_columns">
-                        Show Zero Months
-                    </t>
-                    <t t-else="">
-                        Hide Zero Months
-                    </t>
-                </button>
-            </t>
+            <button
+                class="btn btn-secondary"
+                t-att-class="{ 'active': controller.cachedFilterOptions.vhg_show_monthly_columns }"
+                t-on-click="toggleMonthlyColumns"
+            >
+                <i class="fa fa-calendar me-1"/>Show Monthly Columns
+            </button>
+            <button
+                class="btn btn-secondary"
+                t-att-class="{ 'active': controller.cachedFilterOptions.vhg_hide_zero_monthly_columns }"
+                t-on-click="toggleZeroMonthlyColumns"
+            >
+                <i class="fa fa-eye-slash me-1"/>
+                <t t-if="controller.cachedFilterOptions.vhg_hide_zero_monthly_columns">
+                    Show Zero Months
+                </t>
+                <t t-else="">
+                    Hide Zero Months
+                </t>
+            </button>
         </xpath>
     </t>
 

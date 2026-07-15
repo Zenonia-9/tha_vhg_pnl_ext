@@ -77,6 +77,22 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 options["vhg_summary_query_groups"][entity["query_key"]] = self._query_group(
                     fiscal_start, month_end, forced_domain=entity["forced_domain"]
                 )
+            visible_months = []
+            if show_months:
+                for start, end in months:
+                    key = f"actual_{start:%Y_%m}"
+                    options["vhg_summary_fiscal_month_keys"].append(key)
+                    options["vhg_summary_query_groups"][key] = self._query_group(start, end)
+                visible_months = months
+                if hide_zero_months:
+                    group_balances = self._query_summary_balances(report, options)
+                    visible_months = [
+                        (start, end) for start, end in visible_months
+                        if self._month_has_actual(group_balances, start)
+                    ]
+                options["vhg_summary_month_keys"] = [
+                    f"actual_{start:%Y_%m}" for start, _end in visible_months
+                ]
             if selected_budget_ids:
                 options["vhg_summary_query_groups"]["budget_ytd"] = self._query_group(
                     fiscal_start, month_end, selected_budget_ids[0]
@@ -87,11 +103,20 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 for entity in horizontal_entities
             ] + [
                 {"name": f"Conso ({period_label})", "colspan": 2},
+            ]
+            if visible_months:
+                options["vhg_summary_horizontal_headers"].append({
+                    "name": f"Monthly Conso (FY {fiscal_start:%Y}-{fiscal_end:%y})",
+                    "colspan": len(visible_months),
+                })
+            options["vhg_summary_horizontal_headers"].extend([
                 {"name": "Budget", "colspan": 2},
                 {"name": "Variance", "colspan": 2},
-            ]
+            ])
             options["column_groups"] = {"summary": {"forced_options": {}, "forced_domain": []}}
-            options["columns"] = self._horizontal_display_columns(horizontal_entities, period_label)
+            options["columns"] = self._horizontal_display_columns(
+                horizontal_entities, period_label, visible_months
+            )
             options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
         else:
             for start, end in months:
@@ -256,7 +281,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         ])
         return columns
 
-    def _horizontal_display_columns(self, entities, period_label):
+    def _horizontal_display_columns(self, entities, period_label, months):
         columns = [self._column("No.", "sequence", "string")]
         for index, _entity in enumerate(entities):
             columns.extend([
@@ -266,6 +291,12 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         columns.extend([
             self._column("Total", "consolidated_actual"),
             self._column("%", "consolidated_percent", "percentage"),
+        ])
+        columns.extend(
+            self._column(start.strftime("%b %Y"), f"month_{start:%Y_%m}")
+            for start, _end in months
+        )
+        columns.extend([
             self._column(period_label, "ytd_budget"),
             self._column("%", "ytd_budget_percent", "percentage"),
             self._column("Amount", "ytd_variance"),
@@ -422,6 +453,8 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "ytd_variance": variance,
             "ytd_variance_percent": self._ratio(variance, budget) if has_budget else None,
         })
+        for month_key in options["vhg_summary_month_keys"]:
+            data[f"month_{month_key.removeprefix('actual_')}"] = values[row_key][month_key]
         return [
             report._build_column_dict(
                 data.get(column["expression_label"]),

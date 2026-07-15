@@ -174,19 +174,68 @@ for line in horizontal_lines:
     )
     assert abs(line["columns"][consolidated_index]["no_format"] - entity_total) < 0.01
 
+horizontal_expanded_options = consolidated_report.get_options({
+    **budget_previous,
+    "selected_horizontal_group_id": horizontal_group.id,
+    "vhg_show_monthly_columns": True,
+})
+horizontal_expanded_lines = consolidated_report._get_lines(horizontal_expanded_options)
+assert horizontal_expanded_options["vhg_summary_month_keys"] == [
+    "actual_2026_04", "actual_2026_05", "actual_2026_06", "actual_2026_07",
+]
+assert any(
+    header["name"].startswith("Monthly Conso")
+    and header["colspan"] == len(horizontal_expanded_options["vhg_summary_month_keys"])
+    for header in horizontal_expanded_options["vhg_summary_horizontal_headers"]
+)
+assert len(horizontal_expanded_options["columns"]) == (
+    len(horizontal_options["columns"])
+    + len(horizontal_expanded_options["vhg_summary_month_keys"])
+)
+horizontal_show_zero_options = consolidated_report.get_options({
+    **budget_previous,
+    "selected_horizontal_group_id": horizontal_group.id,
+    "vhg_show_monthly_columns": True,
+    "vhg_hide_zero_monthly_columns": False,
+})
+assert horizontal_show_zero_options["vhg_summary_month_keys"] == [
+    f"actual_{year}_{month:02d}"
+    for year, month in [(2026, month) for month in range(4, 13)] + [(2027, month) for month in range(1, 4)]
+]
+monthly_start = consolidated_index + 2
+monthly_end = monthly_start + len(horizontal_expanded_options["vhg_summary_month_keys"])
+for line in horizontal_expanded_lines:
+    monthly_total = sum(
+        cell["no_format"] or 0.0
+        for cell in line["columns"][monthly_start:monthly_end]
+    )
+    assert abs(line["columns"][consolidated_index]["no_format"] - monthly_total) < 0.01
+
 horizontal_xlsx = consolidated_report.export_to_xlsx(horizontal_options)
 assert len(horizontal_xlsx["file_content"]) > 1000
 with ZipFile(BytesIO(horizontal_xlsx["file_content"])) as workbook:
     worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
     assert b'A1:A2' in worksheet_xml
     assert b'B1:B2' in worksheet_xml
-    for index in range(len(horizontal_options["vhg_summary_horizontal_headers"])):
-        start = 3 + (2 * index)
-        end = start + 1
+    start = 3
+    for header in horizontal_options["vhg_summary_horizontal_headers"]:
+        end = start + header["colspan"] - 1
         merged_range = f"{column_name(start)}1:{column_name(end)}1".encode()
         assert merged_range in worksheet_xml, merged_range
+        start = end + 1
+horizontal_expanded_xlsx = consolidated_report.export_to_xlsx(horizontal_expanded_options)
+with ZipFile(BytesIO(horizontal_expanded_xlsx["file_content"])) as workbook:
+    worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
+    start = 3
+    for header in horizontal_expanded_options["vhg_summary_horizontal_headers"]:
+        end = start + header["colspan"] - 1
+        merged_range = f"{column_name(start)}1:{column_name(end)}1".encode()
+        assert merged_range in worksheet_xml, merged_range
+        start = end + 1
 horizontal_pdf = consolidated_report.export_to_pdf(horizontal_options)
 assert len(horizontal_pdf["file_content"]) > 1000
+horizontal_expanded_pdf = consolidated_report.export_to_pdf(horizontal_expanded_options)
+assert len(horizontal_expanded_pdf["file_content"]) > 1000
 
 xlsx = report.export_to_xlsx(budget_options)
 assert len(xlsx["file_content"]) > 1000
