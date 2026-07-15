@@ -76,7 +76,8 @@
                 </tr>
             </t>
             <t t-else="">
-                <t t-set="monthCount" t-value="controller.options.columns.length - 13"/>
+                <t t-set="actualMonthCount" t-value="controller.options.vhg_summary_month_keys.length"/>
+                <t t-set="budgetMonthCount" t-value="controller.options.vhg_summary_budget_month_keys.length"/>
                 <tr data-id="column_headers_row">
                     <th class="column_header" colspan="6">
                         <t t-out="controller.options.vhg_summary_mtd_label"/>
@@ -86,7 +87,8 @@
                     <th class="column_header" colspan="2">
                         <t t-out="controller.options.vhg_summary_ytd_actual_label"/>
                     </th>
-                    <th t-if="monthCount" class="column_header" t-att-colspan="monthCount">Monthly Actual</th>
+                    <th t-if="actualMonthCount" class="column_header" t-att-colspan="actualMonthCount">Monthly Actual</th>
+                    <th t-if="budgetMonthCount" class="column_header" t-att-colspan="budgetMonthCount">Monthly Budget</th>
                     <th class="column_header" colspan="4">
                         <t t-out="controller.options.vhg_summary_ytd_budget_label"/>
                     </th>

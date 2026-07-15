@@ -55,6 +55,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "vhg_show_monthly_columns": bool(show_months),
             "vhg_hide_zero_monthly_columns": bool(hide_zero_months),
             "vhg_summary_month_keys": [],
+            "vhg_summary_budget_month_keys": [],
             "vhg_summary_fiscal_month_keys": [],
             "vhg_summary_selected_month_key": f"actual_{month_start:%Y_%m}",
             "vhg_summary_ytd_month_keys": [
@@ -128,9 +129,24 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             options["vhg_summary_month_keys"] = [
                 f"actual_{start:%Y_%m}" for start, _end in visible_months
             ]
+            # Budget monthly detail is an expanded view only. Keep the standard
+            # two-month Actual preview compact until the user explicitly expands it.
+            if show_months:
+                options["vhg_summary_budget_month_keys"] = [
+                    f"budget_{start:%Y_%m}" for start, _end in visible_months
+                ]
+                if selected_budget_ids:
+                    budget_id = selected_budget_ids[0]
+                    for start, end in visible_months:
+                        key = f"budget_{start:%Y_%m}"
+                        options["vhg_summary_query_groups"][key] = self._query_group(
+                            start, end, budget_id
+                        )
 
             options["column_groups"] = {"summary": {"forced_options": {}, "forced_domain": []}}
-            options["columns"] = self._display_columns(visible_months, month_start)
+            options["columns"] = self._display_columns(
+                visible_months, month_start, show_budget_months=show_months
+            )
             options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
 
         options["unfolded_lines"] = []
@@ -211,7 +227,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "sortable": False,
         }
 
-    def _display_columns(self, months, selected_month):
+    def _display_columns(self, months, selected_month, show_budget_months=False):
         columns = [
             self._column(selected_month.strftime("%b %Y"), "mtd_actual"),
             self._column("%", "mtd_actual_percent", "percentage"),
@@ -227,6 +243,11 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             self._column(start.strftime("%b %Y"), f"month_{start:%Y_%m}")
             for start, _end in months
         )
+        if show_budget_months:
+            columns.extend(
+                self._column(start.strftime("%b %Y"), f"budget_month_{start:%Y_%m}")
+                for start, _end in months
+            )
         columns.extend([
             self._column("Budget", "ytd_budget"),
             self._column("%", "ytd_budget_percent", "percentage"),
@@ -357,6 +378,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         }
         for month_key in options["vhg_summary_month_keys"]:
             data[f"month_{month_key.removeprefix('actual_')}"] = values[row_key][month_key]
+        for budget_month_key in options["vhg_summary_budget_month_keys"]:
+            data[f"budget_month_{budget_month_key.removeprefix('budget_')}"] = (
+                values[row_key][budget_month_key] if has_budget else None
+            )
 
         columns = []
         for column in options["columns"]:

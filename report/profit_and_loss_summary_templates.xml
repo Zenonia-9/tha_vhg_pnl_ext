@@ -46,7 +46,8 @@
                     <th rowspan="2">No.</th>
                     <th rowspan="2">Particular</th>
                     <th colspan="2"><t t-out="options['vhg_summary_ytd_actual_label']"/></th>
-                    <th t-if="len(options['columns']) &gt; 13" t-att-colspan="len(options['columns']) - 13">Monthly Actual</th>
+                    <th t-if="options['vhg_summary_month_keys']" t-att-colspan="len(options['vhg_summary_month_keys'])">Monthly Actual</th>
+                    <th t-if="options['vhg_summary_budget_month_keys']" t-att-colspan="len(options['vhg_summary_budget_month_keys'])">Monthly Budget</th>
                     <th colspan="4"><t t-out="options['vhg_summary_ytd_budget_label']"/></th>
                 </tr>
                 <tr>

@@ -53,6 +53,7 @@ assert no_budget_options["vhg_summary_ytd_month_keys"] == [
 assert no_budget_options["vhg_summary_month_keys"] == [
     "actual_2026_06", "actual_2026_07",
 ]
+assert no_budget_options["vhg_summary_budget_month_keys"] == []
 assert no_budget_options["vhg_summary_fiscal_month_keys"] == [
     f"actual_{year}_{month:02d}"
     for year, month in [(2026, month) for month in range(4, 13)] + [(2027, month) for month in range(1, 4)]
@@ -82,6 +83,29 @@ expanded_options = report.get_options({
 assert expanded_options["vhg_summary_month_keys"] == [
     "actual_2026_04", "actual_2026_05", "actual_2026_06", "actual_2026_07",
 ]
+assert expanded_options["vhg_summary_budget_month_keys"] == [
+    "budget_2026_04", "budget_2026_05", "budget_2026_06", "budget_2026_07",
+]
+expanded_lines = report._get_lines(expanded_options)
+assert any(
+    cell.get("no_format")
+    for line in expanded_lines
+    for column, cell in zip(expanded_options["columns"], line["columns"])
+    if column["expression_label"] == "budget_month_2026_07"
+)
+no_budget_expanded_options = report.get_options({
+    **base_previous,
+    "vhg_show_monthly_columns": True,
+})
+assert no_budget_expanded_options["vhg_summary_budget_month_keys"] == [
+    "budget_2026_04", "budget_2026_05", "budget_2026_06", "budget_2026_07",
+]
+assert all(
+    cell["no_format"] is None
+    for line in report._get_lines(no_budget_expanded_options)
+    for column, cell in zip(no_budget_expanded_options["columns"], line["columns"])
+    if column["expression_label"].startswith("budget_month_")
+)
 show_zero_options = report.get_options({
     **budget_previous,
     "vhg_show_monthly_columns": True,
@@ -90,6 +114,10 @@ show_zero_options = report.get_options({
 assert show_zero_options["vhg_hide_zero_monthly_columns"] is False
 assert show_zero_options["vhg_summary_month_keys"] == [
     f"actual_{year}_{month:02d}"
+    for year, month in [(2026, month) for month in range(4, 13)] + [(2027, month) for month in range(1, 4)]
+]
+assert show_zero_options["vhg_summary_budget_month_keys"] == [
+    f"budget_{year}_{month:02d}"
     for year, month in [(2026, month) for month in range(4, 13)] + [(2027, month) for month in range(1, 4)]
 ]
 handler = env["tha.vhg.pnl.summary.report.handler"]
@@ -165,6 +193,11 @@ assert len(xlsx["file_content"]) > 1000
 with ZipFile(BytesIO(xlsx["file_content"])) as workbook:
     worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
     for merged_range in (b'A1:F1', b'G1:G2', b'H1:H2', b'I1:J1', b'K1:L1', b'M1:P1'):
+        assert merged_range in worksheet_xml, merged_range
+expanded_xlsx = report.export_to_xlsx(expanded_options)
+with ZipFile(BytesIO(expanded_xlsx["file_content"])) as workbook:
+    worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
+    for merged_range in (b'A1:F1', b'G1:G2', b'H1:H2', b'I1:J1', b'K1:N1', b'O1:R1', b'S1:V1'):
         assert merged_range in worksheet_xml, merged_range
 pdf = report.export_to_pdf(budget_options)
 assert len(pdf["file_content"]) > 1000

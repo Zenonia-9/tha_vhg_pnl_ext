@@ -76,14 +76,21 @@ class AccountReport(models.Model):
                 )
             return
 
-        month_count = len(columns) - 13
+        actual_month_count = len(print_options["vhg_summary_month_keys"])
+        budget_month_count = len(print_options["vhg_summary_budget_month_keys"])
         sheet.merge_range(0, 0, 0, 5, print_options["vhg_summary_mtd_label"], header)
         sheet.merge_range(0, 6, 1, 6, "No.", header)
         sheet.merge_range(0, 7, 1, 7, "Particular", header)
         sheet.merge_range(0, 8, 0, 9, print_options["vhg_summary_ytd_actual_label"], header)
-        if month_count:
-            sheet.merge_range(0, 10, 0, 9 + month_count, "Monthly Actual", header)
-        ytd_budget_start = 10 + month_count
+        if actual_month_count:
+            sheet.merge_range(0, 10, 0, 9 + actual_month_count, "Monthly Actual", header)
+        budget_month_start = 10 + actual_month_count
+        if budget_month_count:
+            sheet.merge_range(
+                0, budget_month_start, 0, budget_month_start + budget_month_count - 1,
+                "Monthly Budget", header,
+            )
+        ytd_budget_start = budget_month_start + budget_month_count
         sheet.merge_range(
             0,
             ytd_budget_start,
