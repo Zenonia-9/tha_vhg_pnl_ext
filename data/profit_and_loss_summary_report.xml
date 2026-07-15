@@ -29,7 +29,7 @@
         id="menu_action_report_vhg_profit_and_loss_summary"
         name="Management Profit and Loss Summary"
         action="action_report_vhg_profit_and_loss_summary"
-        parent="account.account_reports_legal_statements_menu"
+        parent="menu_vhg_management_reports"
         groups="account.group_account_readonly"
-        sequence="16"/>
+        sequence="20"/>
 </odoo>

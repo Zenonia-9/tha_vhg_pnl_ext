@@ -27,10 +27,17 @@
     </record>
 
     <menuitem
+        id="menu_vhg_management_reports"
+        name="Management Reports"
+        parent="account.menu_finance_configuration"
+        groups="account.group_account_readonly"
+        sequence="5"/>
+
+    <menuitem
         id="menu_action_report_vhg_profit_and_loss"
         name="Management Profit and Loss Notes"
         action="action_report_vhg_profit_and_loss"
-        parent="account.account_reports_legal_statements_menu"
+        parent="menu_vhg_management_reports"
         groups="account.group_account_readonly"
-        sequence="15"/>
+        sequence="10"/>
 </odoo>
