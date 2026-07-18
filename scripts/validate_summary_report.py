@@ -112,6 +112,11 @@ june_expanded_options = report.get_options({
 assert june_expanded_options["vhg_summary_budget_month_keys"] == [
     "budget_2026_04", "budget_2026_05", "budget_2026_06",
 ]
+assert [
+    column["expression_label"]
+    for column in june_expanded_options["columns"]
+    if column["expression_label"].startswith("budget_month_")
+] == ["budget_month_2026_04", "budget_month_2026_05", "budget_month_2026_06"]
 no_budget_expanded_options = report.get_options({
     **base_previous,
     "vhg_show_monthly_columns": True,
@@ -137,6 +142,14 @@ assert show_zero_options["vhg_summary_month_keys"] == [
 ]
 assert show_zero_options["vhg_summary_budget_month_keys"] == [
     "budget_2026_04", "budget_2026_05", "budget_2026_06", "budget_2026_07",
+]
+assert [
+    column["expression_label"]
+    for column in show_zero_options["columns"]
+    if column["expression_label"].startswith("budget_month_")
+] == [
+    key.replace("budget_", "budget_month_", 1)
+    for key in show_zero_options["vhg_summary_budget_month_keys"]
 ]
 handler = env["tha.vhg.pnl.summary.report.handler"]
 assert not handler._month_has_actual({"test": {"actual_2026_04": 0.0}}, date(2026, 4, 1))

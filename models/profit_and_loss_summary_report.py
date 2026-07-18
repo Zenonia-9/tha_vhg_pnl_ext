@@ -156,6 +156,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             ]
             # Budget months follow the selected fiscal period, independently of
             # whether the matching Actual month is zero.
+            budget_months = []
             if show_months:
                 budget_months = [
                     (start, end) for start, end in months if start <= month_start
@@ -173,7 +174,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
 
             options["column_groups"] = {"summary": {"forced_options": {}, "forced_domain": []}}
             options["columns"] = self._display_columns(
-                visible_months, month_start, show_budget_months=show_months
+                visible_months, month_start, budget_months=budget_months
             )
             options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
 
@@ -255,7 +256,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "sortable": False,
         }
 
-    def _display_columns(self, months, selected_month, show_budget_months=False):
+    def _display_columns(self, months, selected_month, budget_months=None):
         columns = [
             self._column("Actual", "mtd_actual"),
             self._column("%", "mtd_actual_percent", "percentage"),
@@ -271,10 +272,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             self._column(start.strftime("%b %Y"), f"month_{start:%Y_%m}")
             for start, _end in months
         )
-        if show_budget_months:
+        if budget_months:
             columns.extend(
                 self._column(start.strftime("%b %Y"), f"budget_month_{start:%Y_%m}")
-                for start, _end in months
+                for start, _end in budget_months
             )
         columns.extend([
             self._column("Budget", "ytd_budget"),
