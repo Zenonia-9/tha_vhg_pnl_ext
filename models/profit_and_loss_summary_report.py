@@ -295,15 +295,14 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 "percentage",
                 format_params=column_dict["format_params"],
             )
-        elif (
-            figure_type == "monetary"
-            and options.get("rounding_unit") in {"thousands", "lakhs", "millions"}
-        ):
+        elif figure_type == "monetary":
             rounding_factor = {
+                "decimals": 1.0,
+                "units": 1.0,
                 "thousands": 1_000.0,
                 "lakhs": 100_000.0,
                 "millions": 1_000_000.0,
-            }[options["rounding_unit"]]
+            }.get(options.get("rounding_unit"), 1.0)
             formatted_value = report.format_value(
                 {**options, "rounding_unit": "decimals"},
                 value / rounding_factor if value is not None else None,

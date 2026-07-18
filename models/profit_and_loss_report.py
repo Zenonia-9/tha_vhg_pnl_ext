@@ -448,6 +448,24 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 result[column_group_key] -= value
         return result
 
+    @staticmethod
+    def _format_monetary_display(report, options, value, column_dict):
+        rounding_factor = {
+            "decimals": 1.0,
+            "units": 1.0,
+            "thousands": 1_000.0,
+            "lakhs": 100_000.0,
+            "millions": 1_000_000.0,
+        }.get(options.get("rounding_unit"), 1.0)
+        formatted_value = report.format_value(
+            {**options, "rounding_unit": "decimals"},
+            value / rounding_factor if value is not None else None,
+            "float",
+            format_params={"digits": 2},
+        )
+        column_dict["name"] = formatted_value
+        return column_dict
+
     def _columns(self, report, options, balances, group_key=None, group_balances=None):
         columns = []
         percentage_options = {**options, "rounding_unit": "decimals"}
@@ -504,7 +522,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 options=percentage_options if is_actual_percent else options,
                 digits=2 if is_period_total or is_actual_percent else 1,
             )
-            if is_actual_percent:
+            if column["figure_type"] == "monetary":
+                column_dict = self._format_monetary_display(
+                    report, options, value, column_dict
+                )
+            elif is_actual_percent:
                 formatted_percentage = report.format_value(
                     percentage_options,
                     value,

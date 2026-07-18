@@ -12,6 +12,11 @@ def column_name(number):
     return name
 
 
+def displayed_number(cell):
+    value = cell["no_format"]
+    return float(value.replace(",", "")) if isinstance(value, str) else value
+
+
 company = env["res.company"].search([
     ("name", "ilike", "THUKHA SAYTANAR CO. Ltd"),
 ], limit=1)
@@ -200,10 +205,10 @@ assert all(not line.get("unfoldable") for line in horizontal_lines)
 consolidated_index = 1 + (2 * len(entities))
 for line in horizontal_lines:
     entity_total = sum(
-        line["columns"][1 + (2 * index)]["no_format"] or 0.0
+        displayed_number(line["columns"][1 + (2 * index)]) or 0.0
         for index in range(len(entities))
     )
-    assert abs(line["columns"][consolidated_index]["no_format"] - entity_total) < 0.01
+    assert abs(displayed_number(line["columns"][consolidated_index]) - entity_total) < 0.01
 
 horizontal_expanded_options = consolidated_report.get_options({
     **budget_previous,
@@ -237,10 +242,10 @@ monthly_start = consolidated_index + 2
 monthly_end = monthly_start + len(horizontal_expanded_options["vhg_summary_month_keys"])
 for line in horizontal_expanded_lines:
     monthly_total = sum(
-        cell["no_format"] or 0.0
+        displayed_number(cell) or 0.0
         for cell in line["columns"][monthly_start:monthly_end]
     )
-    assert abs(line["columns"][consolidated_index]["no_format"] - monthly_total) < 0.01
+    assert abs(displayed_number(line["columns"][consolidated_index]) - monthly_total) < 0.01
 
 horizontal_xlsx = consolidated_report.export_to_xlsx(horizontal_options)
 assert len(horizontal_xlsx["file_content"]) > 1000
@@ -301,6 +306,24 @@ million_file_lines = report._get_lines(million_file_options)
 total_revenue_file = next(
     line for line in million_file_lines if line["name"] == "Total Revenue"
 )
+raw_total_revenue = total_revenue_file["columns"][0]["no_format"]
+for rounding_unit, factor in {
+    "decimals": 1.0,
+    "units": 1.0,
+    "thousands": 1_000.0,
+    "lakhs": 100_000.0,
+    "millions": 1_000_000.0,
+}.items():
+    unit_options = report.get_options({
+        **budget_previous,
+        "rounding_unit": rounding_unit,
+    })
+    unit_lines = report._get_lines(unit_options)
+    unit_total_revenue = next(line for line in unit_lines if line["name"] == "Total Revenue")
+    assert unit_total_revenue["columns"][0]["figure_type"] == "string"
+    assert float(unit_total_revenue["columns"][0]["no_format"].replace(",", "")) == round(
+        raw_total_revenue / factor, 2
+    )
 million_xlsx = report.export_to_xlsx(million_options)
 with ZipFile(BytesIO(million_xlsx["file_content"])) as workbook:
     worksheet = ElementTree.fromstring(workbook.read("xl/worksheets/sheet1.xml"))
