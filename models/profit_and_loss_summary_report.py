@@ -257,7 +257,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
 
     def _display_columns(self, months, selected_month, show_budget_months=False):
         columns = [
-            self._column(selected_month.strftime("%b %Y"), "mtd_actual"),
+            self._column("Actual", "mtd_actual"),
             self._column("%", "mtd_actual_percent", "percentage"),
             self._column("Budget", "mtd_budget"),
             self._column("%", "mtd_budget_percent", "percentage"),
@@ -283,6 +283,42 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             self._column("%", "ytd_variance_percent", "percentage"),
         ])
         return columns
+
+    @staticmethod
+    def _format_display_column(report, options, percentage_options, column, value, column_dict):
+        figure_type = column["figure_type"]
+        if figure_type == "percentage":
+            formatted_value = report.format_value(
+                percentage_options,
+                value,
+                "percentage",
+                format_params=column_dict["format_params"],
+            )
+        elif (
+            figure_type == "monetary"
+            and options.get("rounding_unit") in {"thousands", "lakhs", "millions"}
+        ):
+            rounding_factor = {
+                "thousands": 1_000.0,
+                "lakhs": 100_000.0,
+                "millions": 1_000_000.0,
+            }[options["rounding_unit"]]
+            formatted_value = report.format_value(
+                {**options, "rounding_unit": "decimals"},
+                value / rounding_factor if value is not None else None,
+                "float",
+                format_params={"digits": 2},
+            )
+        else:
+            return column_dict
+
+        column_dict["name"] = formatted_value
+        if options.get("export_mode") != "file":
+            column_dict.update({
+                "figure_type": "string",
+                "no_format": formatted_value if value is not None else None,
+            })
+        return column_dict
 
     def _horizontal_display_columns(self, entities, period_label, months):
         columns = [self._column("No.", "sequence", "string")]
@@ -431,19 +467,9 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 ),
                 digits=2 if column["figure_type"] == "percentage" else 1,
             )
-            if column["figure_type"] == "percentage":
-                formatted_percentage = report.format_value(
-                    percentage_options,
-                    value,
-                    "percentage",
-                    format_params=column_dict["format_params"],
-                )
-                column_dict["name"] = formatted_percentage
-                if options.get("export_mode") != "file":
-                    column_dict.update({
-                        "figure_type": "string",
-                        "no_format": formatted_percentage if value is not None else None,
-                    })
+            column_dict = self._format_display_column(
+                report, options, percentage_options, column, value, column_dict
+            )
             columns.append(column_dict)
         return columns
 
@@ -491,19 +517,9 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 ),
                 digits=2 if column["figure_type"] == "percentage" else 1,
             )
-            if column["figure_type"] == "percentage":
-                formatted_percentage = report.format_value(
-                    percentage_options,
-                    value,
-                    "percentage",
-                    format_params=column_dict["format_params"],
-                )
-                column_dict["name"] = formatted_percentage
-                if options.get("export_mode") != "file":
-                    column_dict.update({
-                        "figure_type": "string",
-                        "no_format": formatted_percentage if value is not None else None,
-                    })
+            column_dict = self._format_display_column(
+                report, options, percentage_options, column, value, column_dict
+            )
             columns.append(column_dict)
         return columns
 

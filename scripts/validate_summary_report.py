@@ -39,7 +39,7 @@ no_budget_options = report.get_options(base_previous)
 no_budget_lines = report._get_lines(no_budget_options)
 assert no_budget_options["vhg_hide_zero_monthly_columns"] is True
 assert [column["name"] for column in no_budget_options["columns"][:9]] == [
-    "Jul 2026", "%", "Budget", "%", "Variance", "%", "No.", "Actual", "%",
+    "Actual", "%", "Budget", "%", "Variance", "%", "No.", "Actual", "%",
 ]
 assert len(no_budget_lines) == 27, len(no_budget_lines)
 assert all(not line.get("unfoldable") for line in no_budget_lines)
@@ -275,15 +275,26 @@ million_options = report.get_options({
 })
 million_lines = report._get_lines(million_options)
 total_revenue = next(line for line in million_lines if line["name"] == "Total Revenue")
+assert total_revenue["columns"][0]["name"] == "0.05"
+assert total_revenue["columns"][0]["no_format"] == "0.05"
 assert total_revenue["columns"][1]["name"] == "100.00%"
 assert total_revenue["columns"][1]["no_format"] == "100.00%"
+million_file_options = report.get_options({
+    **budget_previous,
+    "rounding_unit": "millions",
+    "export_mode": "file",
+})
+million_file_lines = report._get_lines(million_file_options)
+total_revenue_file = next(
+    line for line in million_file_lines if line["name"] == "Total Revenue"
+)
 million_xlsx = report.export_to_xlsx(million_options)
 with ZipFile(BytesIO(million_xlsx["file_content"])) as workbook:
     worksheet = ElementTree.fromstring(workbook.read("xl/worksheets/sheet1.xml"))
     namespace = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
     first_total_revenue_value = worksheet.find(".//x:c[@r='A6']/x:v", namespace)
     assert first_total_revenue_value is not None
-    expected_millions = total_revenue["columns"][0]["no_format"] / 1_000_000.0
+    expected_millions = total_revenue_file["columns"][0]["no_format"] / 1_000_000.0
     assert abs(float(first_total_revenue_value.text) - expected_millions) < 0.000001
 
 sequence_by_name = {
