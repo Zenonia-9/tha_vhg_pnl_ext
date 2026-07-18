@@ -22,7 +22,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     )
     _SUMMARY_OPERATING_EXPENSE_GROUPS = (
         "cost_of_goods_sold", "operating_cost", "staff_cost", "bonus",
-        "administrative", "repair_maintenance", "sales_marketing",
+        "administrative", "repair_maintenance", "sales_marketing", "commission_expense",
     )
 
     def _custom_options_initializer(self, report, options, previous_options):
@@ -154,15 +154,18 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             options["vhg_summary_month_keys"] = [
                 f"actual_{start:%Y_%m}" for start, _end in visible_months
             ]
-            # Budget monthly detail is an expanded view only. Keep the standard
-            # two-month Actual preview compact until the user explicitly expands it.
+            # Budget months follow the selected fiscal period, independently of
+            # whether the matching Actual month is zero.
             if show_months:
+                budget_months = [
+                    (start, end) for start, end in months if start <= month_start
+                ]
                 options["vhg_summary_budget_month_keys"] = [
-                    f"budget_{start:%Y_%m}" for start, _end in visible_months
+                    f"budget_{start:%Y_%m}" for start, _end in budget_months
                 ]
                 if selected_budget_ids:
                     budget_id = selected_budget_ids[0]
-                    for start, end in visible_months:
+                    for start, end in budget_months:
                         key = f"budget_{start:%Y_%m}"
                         options["vhg_summary_query_groups"][key] = self._query_group(
                             start, end, budget_id
@@ -415,14 +418,33 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             )
 
         columns = []
+        percentage_options = {**options, "rounding_unit": "decimals"}
         for column in options["columns"]:
             value = data.get(column["expression_label"])
-            columns.append(report._build_column_dict(
+            column_dict = report._build_column_dict(
                 value,
                 column,
-                options=options,
+                options=(
+                    percentage_options
+                    if column["figure_type"] == "percentage"
+                    else options
+                ),
                 digits=2 if column["figure_type"] == "percentage" else 1,
-            ))
+            )
+            if column["figure_type"] == "percentage":
+                formatted_percentage = report.format_value(
+                    percentage_options,
+                    value,
+                    "percentage",
+                    format_params=column_dict["format_params"],
+                )
+                column_dict["name"] = formatted_percentage
+                if options.get("export_mode") != "file":
+                    column_dict.update({
+                        "figure_type": "string",
+                        "no_format": formatted_percentage if value is not None else None,
+                    })
+            columns.append(column_dict)
         return columns
 
     def _horizontal_line_columns(self, report, options, row_key, values, sequence):
@@ -455,15 +477,35 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         })
         for month_key in options["vhg_summary_month_keys"]:
             data[f"month_{month_key.removeprefix('actual_')}"] = values[row_key][month_key]
-        return [
-            report._build_column_dict(
-                data.get(column["expression_label"]),
+        percentage_options = {**options, "rounding_unit": "decimals"}
+        columns = []
+        for column in options["columns"]:
+            value = data.get(column["expression_label"])
+            column_dict = report._build_column_dict(
+                value,
                 column,
-                options=options,
+                options=(
+                    percentage_options
+                    if column["figure_type"] == "percentage"
+                    else options
+                ),
                 digits=2 if column["figure_type"] == "percentage" else 1,
             )
-            for column in options["columns"]
-        ]
+            if column["figure_type"] == "percentage":
+                formatted_percentage = report.format_value(
+                    percentage_options,
+                    value,
+                    "percentage",
+                    format_params=column_dict["format_params"],
+                )
+                column_dict["name"] = formatted_percentage
+                if options.get("export_mode") != "file":
+                    column_dict.update({
+                        "figure_type": "string",
+                        "no_format": formatted_percentage if value is not None else None,
+                    })
+            columns.append(column_dict)
+        return columns
 
     def _dynamic_lines_generator(self, report, options, all_column_groups_expression_totals, warnings=None):
         group_balances = self._query_summary_balances(report, options)
@@ -520,7 +562,9 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         lines = []
         for key, name in rows:
             sequence = ""
-            if key in group_keys:
+            if key == "commission_expense":
+                sequence = "14.1"
+            elif key in group_keys:
                 group_number += 1
                 sequence = str(group_number)
             lines.append((0, {

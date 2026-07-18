@@ -1,5 +1,6 @@
 from datetime import date
 from io import BytesIO
+from xml.etree import ElementTree
 from zipfile import ZipFile
 
 
@@ -40,11 +41,15 @@ assert no_budget_options["vhg_hide_zero_monthly_columns"] is True
 assert [column["name"] for column in no_budget_options["columns"][:9]] == [
     "Jul 2026", "%", "Budget", "%", "Variance", "%", "No.", "Actual", "%",
 ]
-assert len(no_budget_lines) == 26, len(no_budget_lines)
+assert len(no_budget_lines) == 27, len(no_budget_lines)
 assert all(not line.get("unfoldable") for line in no_budget_lines)
 assert all(not line.get("expand_function") for line in no_budget_lines)
 number_cells = [line["columns"][6]["no_format"] for line in no_budget_lines]
-assert [number for number in number_cells if number] == [str(number) for number in range(1, 18)]
+assert [number for number in number_cells if number] == [
+    *[str(number) for number in range(1, 15)],
+    "14.1",
+    *[str(number) for number in range(15, 18)],
+]
 assert not no_budget_options["filters"]["show_period_comparison"]
 assert not no_budget_options["filters"]["show_all"]
 assert no_budget_options["vhg_summary_ytd_month_keys"] == [
@@ -68,7 +73,7 @@ budget_previous = dict(base_previous)
 budget_previous["budgets"] = [{"id": fy_budget.id, "selected": True}]
 budget_options = report.get_options(budget_previous)
 budget_lines = report._get_lines(budget_options)
-assert len(budget_lines) == 26
+assert len(budget_lines) == 27
 assert any(
     cell.get("no_format")
     for line in budget_lines
@@ -93,6 +98,20 @@ assert any(
     for column, cell in zip(expanded_options["columns"], line["columns"])
     if column["expression_label"] == "budget_month_2026_07"
 )
+
+june_expanded_options = report.get_options({
+    "date": {
+        "date_from": "2026-06-01",
+        "date_to": "2026-06-30",
+        "filter": "custom",
+        "mode": "range",
+    },
+    "budgets": [{"id": fy_budget.id, "selected": True}],
+    "vhg_show_monthly_columns": True,
+})
+assert june_expanded_options["vhg_summary_budget_month_keys"] == [
+    "budget_2026_04", "budget_2026_05", "budget_2026_06",
+]
 no_budget_expanded_options = report.get_options({
     **base_previous,
     "vhg_show_monthly_columns": True,
@@ -117,8 +136,7 @@ assert show_zero_options["vhg_summary_month_keys"] == [
     for year, month in [(2026, month) for month in range(4, 13)] + [(2027, month) for month in range(1, 4)]
 ]
 assert show_zero_options["vhg_summary_budget_month_keys"] == [
-    f"budget_{year}_{month:02d}"
-    for year, month in [(2026, month) for month in range(4, 13)] + [(2027, month) for month in range(1, 4)]
+    "budget_2026_04", "budget_2026_05", "budget_2026_06", "budget_2026_07",
 ]
 handler = env["tha.vhg.pnl.summary.report.handler"]
 assert not handler._month_has_actual({"test": {"actual_2026_04": 0.0}}, date(2026, 4, 1))
@@ -164,7 +182,7 @@ assert len(horizontal_options["columns"]) == 1 + (2 * len(entities)) + 6
 assert [column["name"] for column in horizontal_options["columns"][:3]] == [
     "No.", horizontal_options["vhg_summary_horizontal_period_label"], "%",
 ]
-assert len(horizontal_lines) == 26
+assert len(horizontal_lines) == 27
 assert all(not line.get("unfoldable") for line in horizontal_lines)
 consolidated_index = 1 + (2 * len(entities))
 for line in horizontal_lines:
@@ -250,6 +268,31 @@ with ZipFile(BytesIO(expanded_xlsx["file_content"])) as workbook:
         assert merged_range in worksheet_xml, merged_range
 pdf = report.export_to_pdf(budget_options)
 assert len(pdf["file_content"]) > 1000
+
+million_options = report.get_options({
+    **budget_previous,
+    "rounding_unit": "millions",
+})
+million_lines = report._get_lines(million_options)
+total_revenue = next(line for line in million_lines if line["name"] == "Total Revenue")
+assert total_revenue["columns"][1]["name"] == "100.00%"
+assert total_revenue["columns"][1]["no_format"] == "100.00%"
+million_xlsx = report.export_to_xlsx(million_options)
+with ZipFile(BytesIO(million_xlsx["file_content"])) as workbook:
+    worksheet = ElementTree.fromstring(workbook.read("xl/worksheets/sheet1.xml"))
+    namespace = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    first_total_revenue_value = worksheet.find(".//x:c[@r='A6']/x:v", namespace)
+    assert first_total_revenue_value is not None
+    expected_millions = total_revenue["columns"][0]["no_format"] / 1_000_000.0
+    assert abs(float(first_total_revenue_value.text) - expected_millions) < 0.000001
+
+sequence_by_name = {
+    line["name"]: line["columns"][6]["no_format"]
+    for line in budget_lines
+}
+assert sequence_by_name["Sales & Marketing"] == "14"
+assert sequence_by_name["Commission Expense"] == "14.1"
+assert sequence_by_name["Depreciation & Amortization"] == "15"
 
 print({
     "report_id": report.id,

@@ -27,22 +27,22 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         ("inpatient", "Inpatient (Revenue)", -1, (
             "500095", "500100", "500150", "500115", "500135",
         )),
-        ("direct_cost", "Direct Cost (Doctor Fee + Refer + Reading)", 1, (
+        ("direct_cost", "Direct Cost", 1, (
             "600010", "600020", "600030", "600035", "600040", "600045", "600180",
         )),
-        ("other_hospital_revenue", "Other Hospital Revenue (Partnership Income) By F&A", -1, (
+        ("other_hospital_revenue", "Other Hospital Revenue (Partnership Income)", -1, (
             "510030", "510015", "510000", "510010", "510035",
             "510020", "510025", "500185", "500400", "500405", "500410",
             "500415", "500420", "500425", "500600", "510100", "510105",
             "510110", "510115", "510120",
         )),
         # 510585 Need to Remove
-        ("non_hospital_revenue", "Non Hospital Revenue (Rental & Other) By F&A", -1, (
+        ("non_hospital_revenue", "Non Hospital Revenue (Rental & Other)", -1, (
             "510500", "510510", "510515", "510520", "510530", "510535",
             "510540", "510575", "510565", "510545", "510555", "510505",
             "510560", "510570", "510580",
         )),
-        ("rental_complex", "Rental Complex Building & BIS By F&A", -1, (
+        ("rental_complex", "Rental Complex Building & BIS", -1, (
             "510085", "510095", "510125", "510130",
         )),
         ("cost_of_goods_sold", "Cost of Goods Sold", 1, (
@@ -71,7 +71,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "702070", "702080", "702090", "702100", "702110", "702120",
             "702130", "702140", "702150", "702160", "702170", "702180",
             "702190", "702200", "702210", "702220", "702230", "702240",
-            "702250", "702260", "702270", "702280", "702290", "702300",
+            "702250", "702280", "702290", "702300",
             "702310",
         )),
         # 703060 Get from Staff Cost
@@ -80,8 +80,9 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "703080", "703060",
         )),
         ("sales_marketing", "Sales & Marketing", 1, (
-            "704010", "704020", "704030", "704040", "704050",
+            "704020", "704030", "704040", "704050",
         )),
+        ("commission_expense", "Commission Expense", 1, ("704010",)),
         ("taxes", "Taxes", 1, ("707020", "707030", "700180")),
         ("depreciation", "Depreciation & Amortization", 1, (
             "705010", "705020", "705030", "705040", "705050", "705060",
@@ -91,14 +92,15 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         ("interest_income", "Interest Income", -1, ("500750",)),
         ("finance_expenses", "Finance Expenses", 1, (
             "706010", "706020", "706030", "706040", "706050", "706060",
-            "706070", "706080",
+            "706070", "706080", "702260", "702270",
         )),
         ("income_tax", "Income Tax", 1, ("707010",)),
     )
 
     _OPERATING_EXPENSE_GROUPS = (
         "cost_of_goods_sold", "operating_cost", "staff_cost", "bonus",
-        "administrative", "repair_maintenance", "sales_marketing", "taxes",
+        "administrative", "repair_maintenance", "sales_marketing",
+        "commission_expense", "taxes",
     )
 
     _SHARED_PERCENTAGE_GROUPS = {
@@ -448,6 +450,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
     def _columns(self, report, options, balances, group_key=None, group_balances=None):
         columns = []
+        percentage_options = {**options, "rounding_unit": "decimals"}
         budget_percentage_column_groups = options.get("vhg_budget_percentage_column_groups", {})
         actual_percent_column_groups = options.get("vhg_actual_percent_column_groups", {})
         for column in options["columns"]:
@@ -480,7 +483,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     if other_column["column_group_key"] == actual_column_group_key
                 )
                 comparison = report._compute_column_percent_comparison_data(
-                    options,
+                    percentage_options,
                     balances.get(actual_column_group_key, 0.0),
                     balances.get(budget_column_group_key, 0.0),
                     green_on_positive=budget_base_column.get("green_on_positive", False),
@@ -495,12 +498,26 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     options=options,
                 ))
                 continue
-            columns.append(report._build_column_dict(
+            column_dict = report._build_column_dict(
                 value,
                 column,
-                options=options,
+                options=percentage_options if is_actual_percent else options,
                 digits=2 if is_period_total or is_actual_percent else 1,
-            ))
+            )
+            if is_actual_percent:
+                formatted_percentage = report.format_value(
+                    percentage_options,
+                    value,
+                    "percentage",
+                    format_params=column_dict["format_params"],
+                )
+                column_dict["name"] = formatted_percentage
+                if options.get("export_mode") != "file":
+                    column_dict.update({
+                        "figure_type": "string",
+                        "no_format": formatted_percentage if value is not None else None,
+                    })
+            columns.append(column_dict)
         return columns
 
     def _actual_percent(self, group_key, balances, group_balances, column_group_key):
@@ -614,19 +631,19 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             parent = self._group_line(report, options, key, name, group_balances[key])
             lines.append((0, parent))
 
-        for key in ("outpatient", "eopd_day_care", "inpatient"):
+        for key in ("inpatient", "outpatient", "eopd_day_care"):
             add_group(key)
 
         total_revenue = self._combine(
             group_balances,
-            additions=("outpatient", "eopd_day_care", "inpatient"),
+            additions=("inpatient", "outpatient", "eopd_day_care"),
         )
         lines.append((0, self._total_line(report, options, "total_revenue", "Total Revenue", total_revenue)))
 
         add_group("direct_cost")
         net_revenues = self._combine(
             group_balances,
-            additions=("outpatient", "eopd_day_care", "inpatient"),
+            additions=("inpatient", "outpatient", "eopd_day_care"),
             deductions=("direct_cost",),
         )
         lines.append((0, self._total_line(report, options, "net_revenues", "Net Revenues", net_revenues)))

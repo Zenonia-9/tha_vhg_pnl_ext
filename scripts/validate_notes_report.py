@@ -19,6 +19,19 @@ options = report.get_options({
 })
 lines = report._get_lines(options)
 
+line_names = [line["name"] for line in lines]
+group_names = [
+    line["name"] for line in lines
+    if line.get("level") == 1 and line.get("unfoldable")
+]
+assert group_names[:3] == [
+    "Inpatient (Revenue)", "Outpatient (Revenue)", "Other (EOPD, Day care)",
+]
+assert "Direct Cost" in group_names
+assert all("By F&A" not in name for name in group_names)
+assert group_names.index("Sales & Marketing") < group_names.index("Commission Expense")
+assert group_names.index("Commission Expense") < group_names.index("Taxes")
+
 assert len(options["columns"]) == 9
 assert sum(header.get("colspan", 1) for header in options["column_headers"][0]) == 9
 assert [header["name"] for header in options["column_headers"][0]] == [
@@ -44,6 +57,15 @@ unfolded_options = report.get_options({
 unfolded_options["unfold_all"] = True
 unfolded_lines = report._get_lines(unfolded_options)
 bone_dxa = next(line for line in unfolded_lines if line["name"] == "500010 Bone Dxa Income")
+commission = next(line for line in unfolded_lines if line["name"] == "704010 Commission Expenses")
+bank_charges = next(line for line in unfolded_lines if line["name"] == "702270 Bank charges")
+fx_losses = next(line for line in unfolded_lines if line["name"] == "702260 Foreign exchange losses")
+commission_parent = next(line for line in unfolded_lines if line["id"] == commission["parent_id"])
+bank_parent = next(line for line in unfolded_lines if line["id"] == bank_charges["parent_id"])
+fx_parent = next(line for line in unfolded_lines if line["id"] == fx_losses["parent_id"])
+assert commission_parent["name"] == "Commission Expense"
+assert bank_parent["name"] == "Finance Expenses"
+assert fx_parent["name"] == "Finance Expenses"
 expected_budget_percentage = report._compute_column_percent_comparison_data(
     unfolded_options,
     bone_dxa["columns"][2]["no_format"],
@@ -55,6 +77,17 @@ assert bone_dxa["columns"][4]["comparison_mode"] == expected_budget_percentage["
 assert bone_dxa["columns"][4]["figure_type"] == "string"
 assert bone_dxa["columns"][1]["name"].endswith("%")
 assert bone_dxa["columns"][5]["name"].endswith("%")
+
+million_options = report.get_options({
+    "date": options["date"],
+    "comparison": {"filter": "previous_period", "number_period": 1},
+    "budgets": [{"id": budget.id, "selected": True}],
+    "rounding_unit": "millions",
+})
+million_lines = report._get_lines(million_options)
+million_outpatient = next(line for line in million_lines if line["name"] == "Outpatient (Revenue)")
+assert million_outpatient["columns"][1]["name"] == outpatient["columns"][1]["name"]
+assert million_outpatient["columns"][4]["name"] == outpatient["columns"][4]["name"]
 
 taxes = next(line for line in lines if line["name"] == "Taxes")
 total_expenses = next(line for line in lines if line["name"] == "Total Expenses")

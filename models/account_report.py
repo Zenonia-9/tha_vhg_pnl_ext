@@ -49,6 +49,7 @@ class AccountReport(models.Model):
         total_percentage = workbook.add_format({"border": 1, "bold": True, "num_format": "0.00%"})
 
         columns = print_options["columns"]
+        monetary_factor = self._vhg_xlsx_rounding_factor(print_options)
         if print_options.get("vhg_summary_horizontal_mode"):
             sheet.merge_range(0, 0, 1, 0, "No.", header)
             sheet.merge_range(0, 1, 1, 1, "Particular", header)
@@ -73,6 +74,7 @@ class AccountReport(models.Model):
                 self._write_vhg_summary_xlsx_row(
                     sheet, y, values, is_total,
                     text, total_text, number, total_number, percentage, total_percentage,
+                    monetary_factor,
                 )
             return
 
@@ -113,12 +115,22 @@ class AccountReport(models.Model):
             self._write_vhg_summary_xlsx_row(
                 sheet, y, values, is_total,
                 text, total_text, number, total_number, percentage, total_percentage,
+                monetary_factor,
             )
+
+    @staticmethod
+    def _vhg_xlsx_rounding_factor(options):
+        return {
+            "thousands": 1_000.0,
+            "lakhs": 100_000.0,
+            "millions": 1_000_000.0,
+        }.get(options.get("rounding_unit"), 1.0)
 
     @staticmethod
     def _write_vhg_summary_xlsx_row(
         sheet, y, values, is_total,
         text, total_text, number, total_number, percentage, total_percentage,
+        monetary_factor,
     ):
         for x, cell in enumerate(values):
             value = cell.get("no_format")
@@ -127,6 +139,7 @@ class AccountReport(models.Model):
                 value /= 100.0
                 cell_format = total_percentage if is_total else percentage
             elif isinstance(value, (int, float)):
+                value /= monetary_factor
                 cell_format = total_number if is_total else number
             else:
                 cell_format = total_text if is_total else text
