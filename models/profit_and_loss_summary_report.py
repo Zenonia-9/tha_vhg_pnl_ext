@@ -28,6 +28,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     def _custom_options_initializer(self, report, options, previous_options):
         horizontal_mode = bool(options.get("selected_horizontal_group_id"))
         horizontal_entities = self._horizontal_entities(options) if horizontal_mode else []
+        selected_start = fields.Date.to_date(options["date"]["date_from"])
         selected_date = fields.Date.to_date(options["date"]["date_to"])
         month_start = selected_date.replace(day=1)
         month_end = month_start + relativedelta(months=1, days=-1)
@@ -72,18 +73,20 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         })
 
         if horizontal_mode:
-            period_label = f"{fiscal_start:%b-%y} to {month_start:%b-%y}"
+            period_label = self._period_label(selected_start, selected_date)
             for entity in horizontal_entities:
                 options["vhg_summary_query_groups"][entity["query_key"]] = self._query_group(
-                    fiscal_start, month_end, forced_domain=entity["forced_domain"]
+                    selected_start, selected_date, forced_domain=entity["forced_domain"]
                 )
             visible_months = []
             if show_months:
-                for start, end in months:
+                for start, end in self._period_months(selected_start, selected_date):
                     key = f"actual_{start:%Y_%m}"
                     options["vhg_summary_fiscal_month_keys"].append(key)
-                    options["vhg_summary_query_groups"][key] = self._query_group(start, end)
-                visible_months = months
+                    options["vhg_summary_query_groups"][key] = self._query_group(
+                        max(start, selected_start), min(end, selected_date)
+                    )
+                visible_months = self._period_months(selected_start, selected_date)
                 if hide_zero_months:
                     group_balances = self._query_summary_balances(report, options)
                     visible_months = [
@@ -95,7 +98,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 ]
             if selected_budget_ids:
                 options["vhg_summary_query_groups"]["budget_ytd"] = self._query_group(
-                    fiscal_start, month_end, selected_budget_ids[0]
+                    selected_start, selected_date, selected_budget_ids[0]
                 )
             options["vhg_summary_horizontal_period_label"] = period_label
             options["vhg_summary_horizontal_headers"] = [
@@ -106,7 +109,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             ]
             if visible_months:
                 options["vhg_summary_horizontal_headers"].append({
-                    "name": f"Monthly Conso (FY {fiscal_start:%Y}-{fiscal_end:%y})",
+                    "name": f"Monthly Conso ({period_label})",
                     "colspan": len(visible_months),
                 })
             options["vhg_summary_horizontal_headers"].extend([
@@ -229,6 +232,21 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             balances.get(month_key)
             for balances in group_balances.values()
         )
+
+    @staticmethod
+    def _period_months(date_from, date_to):
+        months = []
+        cursor = date_from.replace(day=1)
+        while cursor <= date_to:
+            months.append((cursor, cursor + relativedelta(months=1, days=-1)))
+            cursor += relativedelta(months=1)
+        return months
+
+    @staticmethod
+    def _period_label(date_from, date_to):
+        if date_from.year == date_to.year and date_from.month == date_to.month:
+            return f"{date_from:%b-%y}"
+        return f"{date_from:%b-%y} to {date_to:%b-%y}"
 
     @staticmethod
     def _query_group(date_from, date_to, budget_id=None, forced_domain=None):
@@ -409,6 +427,51 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         return "total_net_revenues"
 
     @staticmethod
+    def _period_amount(values, row_key, keys):
+        return sum(values[row_key][key] for key in keys)
+
+    def _summary_percent(self, row_key, values, keys):
+        """Follow the blue-column formulas used by the approved Summary workbook."""
+        if row_key == "net_revenues":
+            return self._subtract_percentages(
+                self._summary_percent("total_revenue", values, keys),
+                self._summary_percent("direct_cost", values, keys),
+            )
+        if row_key == "total_net_revenues":
+            return self._add_percentages(
+                self._summary_percent("net_revenues", values, keys),
+                self._summary_percent("other_revenue", values, keys),
+            )
+        denominator_key = self._percentage_denominator(row_key)
+        return self._ratio(
+            self._period_amount(values, row_key, keys),
+            self._period_amount(values, denominator_key, keys),
+        )
+
+    def _summary_variance_percent(self, row_key, values, actual_keys, budget_keys):
+        if row_key == "net_revenues":
+            return self._subtract_percentages(
+                self._summary_variance_percent("total_revenue", values, actual_keys, budget_keys),
+                self._summary_variance_percent("direct_cost", values, actual_keys, budget_keys),
+            )
+        if row_key == "total_net_revenues":
+            return self._add_percentages(
+                self._summary_variance_percent("net_revenues", values, actual_keys, budget_keys),
+                self._summary_variance_percent("other_revenue", values, actual_keys, budget_keys),
+            )
+        actual = self._period_amount(values, row_key, actual_keys)
+        budget = self._period_amount(values, row_key, budget_keys)
+        return self._ratio(actual - budget, budget)
+
+    @staticmethod
+    def _add_percentages(left, right):
+        return left + right if left is not None and right is not None else None
+
+    @staticmethod
+    def _subtract_percentages(left, right):
+        return left - right if left is not None and right is not None else None
+
+    @staticmethod
     def _ratio(value, denominator):
         return value * 100.0 / denominator if denominator else None
 
@@ -418,33 +481,32 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
 
         selected_key = options["vhg_summary_selected_month_key"]
         ytd_keys = options["vhg_summary_ytd_month_keys"]
-        denominator_key = self._percentage_denominator(row_key)
         mtd_actual = values[row_key][selected_key]
         ytd_actual = sum(values[row_key][key] for key in ytd_keys)
-        mtd_actual_denominator = values[denominator_key][selected_key]
-        ytd_actual_denominator = sum(values[denominator_key][key] for key in ytd_keys)
         has_budget = bool(options.get("vhg_summary_budget_id"))
         mtd_budget = values[row_key]["budget_mtd"] if has_budget else None
         ytd_budget = values[row_key]["budget_ytd"] if has_budget else None
-        mtd_budget_denominator = values[denominator_key]["budget_mtd"] if has_budget else None
-        ytd_budget_denominator = values[denominator_key]["budget_ytd"] if has_budget else None
         mtd_variance = mtd_actual - mtd_budget if has_budget else None
         ytd_variance = ytd_actual - ytd_budget if has_budget else None
 
         data = {
             "mtd_actual": mtd_actual,
-            "mtd_actual_percent": self._ratio(mtd_actual, mtd_actual_denominator),
+            "mtd_actual_percent": self._summary_percent(row_key, values, [selected_key]),
             "mtd_budget": mtd_budget,
-            "mtd_budget_percent": self._ratio(mtd_budget, mtd_budget_denominator) if has_budget else None,
+            "mtd_budget_percent": self._summary_percent(row_key, values, ["budget_mtd"]) if has_budget else None,
             "mtd_variance": mtd_variance,
-            "mtd_variance_percent": self._ratio(mtd_variance, mtd_budget) if has_budget else None,
+            "mtd_variance_percent": self._summary_variance_percent(
+                row_key, values, [selected_key], ["budget_mtd"]
+            ) if has_budget else None,
             "sequence": sequence,
             "ytd_actual": ytd_actual,
-            "ytd_actual_percent": self._ratio(ytd_actual, ytd_actual_denominator),
+            "ytd_actual_percent": self._summary_percent(row_key, values, ytd_keys),
             "ytd_budget": ytd_budget,
-            "ytd_budget_percent": self._ratio(ytd_budget, ytd_budget_denominator) if has_budget else None,
+            "ytd_budget_percent": self._summary_percent(row_key, values, ["budget_ytd"]) if has_budget else None,
             "ytd_variance": ytd_variance,
-            "ytd_variance_percent": self._ratio(ytd_variance, ytd_budget) if has_budget else None,
+            "ytd_variance_percent": self._summary_variance_percent(
+                row_key, values, ytd_keys, ["budget_ytd"]
+            ) if has_budget else None,
         }
         for month_key in options["vhg_summary_month_keys"]:
             data[f"month_{month_key.removeprefix('actual_')}"] = values[row_key][month_key]
@@ -474,32 +536,31 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         return columns
 
     def _horizontal_line_columns(self, report, options, row_key, values, sequence):
-        denominator_key = self._percentage_denominator(row_key)
         data = {"sequence": sequence}
         consolidated_actual = 0.0
-        consolidated_denominator = 0.0
+        entity_keys = []
         for index, entity in enumerate(options["vhg_summary_horizontal_entities"]):
             query_key = entity["query_key"]
             actual = values[row_key][query_key]
-            denominator = values[denominator_key][query_key]
             data[f"horizontal_{index}_actual"] = actual
-            data[f"horizontal_{index}_percent"] = self._ratio(actual, denominator)
+            data[f"horizontal_{index}_percent"] = self._summary_percent(
+                row_key, values, [query_key]
+            )
             consolidated_actual += actual
-            consolidated_denominator += denominator
+            entity_keys.append(query_key)
 
         has_budget = bool(options.get("vhg_summary_budget_id"))
         budget = values[row_key]["budget_ytd"] if has_budget else None
-        budget_denominator = values[denominator_key]["budget_ytd"] if has_budget else None
         variance = consolidated_actual - budget if has_budget else None
         data.update({
             "consolidated_actual": consolidated_actual,
-            "consolidated_percent": self._ratio(
-                consolidated_actual, consolidated_denominator
-            ),
+            "consolidated_percent": self._summary_percent(row_key, values, entity_keys),
             "ytd_budget": budget,
-            "ytd_budget_percent": self._ratio(budget, budget_denominator) if has_budget else None,
+            "ytd_budget_percent": self._summary_percent(row_key, values, ["budget_ytd"]) if has_budget else None,
             "ytd_variance": variance,
-            "ytd_variance_percent": self._ratio(variance, budget) if has_budget else None,
+            "ytd_variance_percent": self._summary_variance_percent(
+                row_key, values, entity_keys, ["budget_ytd"]
+            ) if has_budget else None,
         })
         for month_key in options["vhg_summary_month_keys"]:
             data[f"month_{month_key.removeprefix('actual_')}"] = values[row_key][month_key]

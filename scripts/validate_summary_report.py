@@ -14,7 +14,7 @@ def column_name(number):
 
 def displayed_number(cell):
     value = cell["no_format"]
-    return float(value.replace(",", "")) if isinstance(value, str) else value
+    return float(value.replace(",", "").rstrip("%")) if isinstance(value, str) else value
 
 
 company = env["res.company"].search([
@@ -85,6 +85,29 @@ assert any(
     for column, cell in zip(budget_options["columns"], line["columns"])
     if column["expression_label"] == "mtd_budget"
 )
+
+columns_by_label = {
+    column["expression_label"]: index
+    for index, column in enumerate(budget_options["columns"])
+}
+lines_by_name = {line["name"]: line for line in budget_lines}
+for prefix in ("mtd_actual", "mtd_budget", "mtd_variance", "ytd_actual", "ytd_budget", "ytd_variance"):
+    net_revenues_percent = displayed_number(
+        lines_by_name["Net Revenues"]["columns"][columns_by_label[f"{prefix}_percent"]]
+    )
+    expected_net_revenues_percent = (
+        displayed_number(lines_by_name["Total Revenue"]["columns"][columns_by_label[f"{prefix}_percent"]])
+        - displayed_number(lines_by_name["Direct Cost"]["columns"][columns_by_label[f"{prefix}_percent"]])
+    )
+    total_net_revenues_percent = displayed_number(
+        lines_by_name["Total Net Revenues"]["columns"][columns_by_label[f"{prefix}_percent"]]
+    )
+    expected_total_net_revenues_percent = (
+        net_revenues_percent
+        + displayed_number(lines_by_name["Other Revenue"]["columns"][columns_by_label[f"{prefix}_percent"]])
+    )
+    assert abs(net_revenues_percent - expected_net_revenues_percent) < 0.02
+    assert abs(total_net_revenues_percent - expected_total_net_revenues_percent) < 0.02
 
 expanded_options = report.get_options({
     **budget_previous,
@@ -217,7 +240,7 @@ horizontal_expanded_options = consolidated_report.get_options({
 })
 horizontal_expanded_lines = consolidated_report._get_lines(horizontal_expanded_options)
 assert horizontal_expanded_options["vhg_summary_month_keys"] == [
-    "actual_2026_04", "actual_2026_05", "actual_2026_06", "actual_2026_07",
+    "actual_2026_07",
 ]
 assert any(
     header["name"].startswith("Monthly Conso")
@@ -235,8 +258,7 @@ horizontal_show_zero_options = consolidated_report.get_options({
     "vhg_hide_zero_monthly_columns": False,
 })
 assert horizontal_show_zero_options["vhg_summary_month_keys"] == [
-    f"actual_{year}_{month:02d}"
-    for year, month in [(2026, month) for month in range(4, 13)] + [(2027, month) for month in range(1, 4)]
+    "actual_2026_07",
 ]
 monthly_start = consolidated_index + 2
 monthly_end = monthly_start + len(horizontal_expanded_options["vhg_summary_month_keys"])
@@ -251,13 +273,14 @@ horizontal_xlsx = consolidated_report.export_to_xlsx(horizontal_options)
 assert len(horizontal_xlsx["file_content"]) > 1000
 with ZipFile(BytesIO(horizontal_xlsx["file_content"])) as workbook:
     worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
-    assert b'A1:A2' in worksheet_xml
-    assert b'B1:B2' in worksheet_xml
+    assert b'A4:A5' in worksheet_xml
+    assert b'B4:B5' in worksheet_xml
     start = 3
     for header in horizontal_options["vhg_summary_horizontal_headers"]:
         end = start + header["colspan"] - 1
-        merged_range = f"{column_name(start)}1:{column_name(end)}1".encode()
-        assert merged_range in worksheet_xml, merged_range
+        merged_range = f"{column_name(start)}4:{column_name(end)}4".encode()
+        if header["colspan"] > 1:
+            assert merged_range in worksheet_xml, merged_range
         start = end + 1
 horizontal_expanded_xlsx = consolidated_report.export_to_xlsx(horizontal_expanded_options)
 with ZipFile(BytesIO(horizontal_expanded_xlsx["file_content"])) as workbook:
@@ -265,8 +288,9 @@ with ZipFile(BytesIO(horizontal_expanded_xlsx["file_content"])) as workbook:
     start = 3
     for header in horizontal_expanded_options["vhg_summary_horizontal_headers"]:
         end = start + header["colspan"] - 1
-        merged_range = f"{column_name(start)}1:{column_name(end)}1".encode()
-        assert merged_range in worksheet_xml, merged_range
+        merged_range = f"{column_name(start)}4:{column_name(end)}4".encode()
+        if header["colspan"] > 1:
+            assert merged_range in worksheet_xml, merged_range
         start = end + 1
 horizontal_pdf = consolidated_report.export_to_pdf(horizontal_options)
 assert len(horizontal_pdf["file_content"]) > 1000
@@ -277,12 +301,12 @@ xlsx = report.export_to_xlsx(budget_options)
 assert len(xlsx["file_content"]) > 1000
 with ZipFile(BytesIO(xlsx["file_content"])) as workbook:
     worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
-    for merged_range in (b'A1:F1', b'G1:G2', b'H1:H2', b'I1:J1', b'K1:L1', b'M1:P1'):
+    for merged_range in (b'A4:F4', b'G4:G5', b'H4:H5', b'I4:J4', b'K4:L4', b'M4:P4'):
         assert merged_range in worksheet_xml, merged_range
 expanded_xlsx = report.export_to_xlsx(expanded_options)
 with ZipFile(BytesIO(expanded_xlsx["file_content"])) as workbook:
     worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
-    for merged_range in (b'A1:F1', b'G1:G2', b'H1:H2', b'I1:J1', b'K1:N1', b'O1:R1', b'S1:V1'):
+    for merged_range in (b'A4:F4', b'G4:G5', b'H4:H5', b'I4:J4', b'K4:N4', b'O4:R4', b'S4:V4'):
         assert merged_range in worksheet_xml, merged_range
 pdf = report.export_to_pdf(budget_options)
 assert len(pdf["file_content"]) > 1000
@@ -328,7 +352,7 @@ million_xlsx = report.export_to_xlsx(million_options)
 with ZipFile(BytesIO(million_xlsx["file_content"])) as workbook:
     worksheet = ElementTree.fromstring(workbook.read("xl/worksheets/sheet1.xml"))
     namespace = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-    first_total_revenue_value = worksheet.find(".//x:c[@r='A6']/x:v", namespace)
+    first_total_revenue_value = worksheet.find(".//x:c[@r='A9']/x:v", namespace)
     assert first_total_revenue_value is not None
     expected_millions = total_revenue_file["columns"][0]["no_format"] / 1_000_000.0
     assert abs(float(first_total_revenue_value.text) - expected_millions) < 0.000001

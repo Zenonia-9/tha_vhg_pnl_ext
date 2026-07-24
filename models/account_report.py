@@ -29,10 +29,13 @@ class AccountReport(models.Model):
         )
 
     def _inject_report_into_xlsx_sheet(self, options, workbook, sheet):
+        notes_report = self.env.ref(
+            "tha_vhg_pnl_ext.report_vhg_profit_and_loss", raise_if_not_found=False
+        )
         summary_report = self.env.ref(
             "tha_vhg_pnl_ext.report_vhg_profit_and_loss_summary", raise_if_not_found=False
         )
-        if self != summary_report:
+        if self not in (notes_report, summary_report):
             return super()._inject_report_into_xlsx_sheet(options, workbook, sheet)
 
         print_options = self.get_options({**options, "export_mode": "file"})
@@ -47,24 +50,49 @@ class AccountReport(models.Model):
         total_number = workbook.add_format({"border": 1, "bold": True, "num_format": "#,##0.00"})
         percentage = workbook.add_format({"border": 1, "num_format": "0.00%"})
         total_percentage = workbook.add_format({"border": 1, "bold": True, "num_format": "0.00%"})
+        yellow_text = workbook.add_format({"border": 1, "bold": True, "bg_color": "#FFFF00"})
+        yellow_number = workbook.add_format({
+            "border": 1, "bold": True, "bg_color": "#FFFF00", "num_format": "#,##0.00",
+        })
+        yellow_percentage = workbook.add_format({
+            "border": 1, "bold": True, "bg_color": "#FFFF00", "num_format": "0.00%",
+        })
+        green_text = workbook.add_format({"border": 1, "bold": True, "bg_color": "#A9D18E"})
+        green_number = workbook.add_format({
+            "border": 1, "bold": True, "bg_color": "#A9D18E", "num_format": "#,##0.00",
+        })
+        green_percentage = workbook.add_format({
+            "border": 1, "bold": True, "bg_color": "#A9D18E", "num_format": "0.00%",
+        })
 
         columns = print_options["columns"]
         monetary_factor = self._vhg_xlsx_rounding_factor(print_options)
+        if self == notes_report:
+            return self._inject_vhg_notes_xlsx(
+                print_options, workbook, sheet, lines, header, text, total_text,
+                number, total_number, percentage, total_percentage,
+                yellow_text, yellow_number, yellow_percentage,
+                green_text, green_number, green_percentage, monetary_factor,
+            )
+
+        title_row = self._write_vhg_xlsx_title(
+            print_options, workbook, sheet, len(columns), self.name,
+        )
         if print_options.get("vhg_summary_horizontal_mode"):
-            sheet.merge_range(0, 0, 1, 0, "No.", header)
-            sheet.merge_range(0, 1, 1, 1, "Particular", header)
+            sheet.merge_range(title_row, 0, title_row + 1, 0, "No.", header)
+            sheet.merge_range(title_row, 1, title_row + 1, 1, "Particular", header)
             x_offset = 2
             for group_header in print_options["vhg_summary_horizontal_headers"]:
                 sheet.merge_range(
-                    0, x_offset, 0, x_offset + group_header.get("colspan", 2) - 1,
+                    title_row, x_offset, title_row, x_offset + group_header.get("colspan", 2) - 1,
                     group_header["name"], header,
                 )
                 x_offset += group_header.get("colspan", 2)
             for x, column in enumerate(columns[1:], start=2):
-                sheet.write(1, x, column["name"], header)
+                sheet.write(title_row + 1, x, column["name"], header)
             sheet.set_column(0, len(columns), 14)
             sheet.set_column(1, 1, 34)
-            for y, line in enumerate(lines, start=2):
+            for y, line in enumerate(lines, start=title_row + 2):
                 is_total = line.get("level") == 0
                 values = (
                     line["columns"][:1]
@@ -74,29 +102,31 @@ class AccountReport(models.Model):
                 self._write_vhg_summary_xlsx_row(
                     sheet, y, values, is_total,
                     text, total_text, number, total_number, percentage, total_percentage,
-                    monetary_factor,
+                    yellow_text, yellow_number, yellow_percentage,
+                    green_text, green_number, green_percentage, monetary_factor,
+                    line["name"],
                 )
             return
 
         actual_month_count = len(print_options["vhg_summary_month_keys"])
         budget_month_count = len(print_options["vhg_summary_budget_month_keys"])
-        sheet.merge_range(0, 0, 0, 5, print_options["vhg_summary_mtd_label"], header)
-        sheet.merge_range(0, 6, 1, 6, "No.", header)
-        sheet.merge_range(0, 7, 1, 7, "Particular", header)
-        sheet.merge_range(0, 8, 0, 9, print_options["vhg_summary_ytd_actual_label"], header)
+        sheet.merge_range(title_row, 0, title_row, 5, print_options["vhg_summary_mtd_label"], header)
+        sheet.merge_range(title_row, 6, title_row + 1, 6, "No.", header)
+        sheet.merge_range(title_row, 7, title_row + 1, 7, "Particular", header)
+        sheet.merge_range(title_row, 8, title_row, 9, print_options["vhg_summary_ytd_actual_label"], header)
         if actual_month_count:
-            sheet.merge_range(0, 10, 0, 9 + actual_month_count, "Monthly Actual", header)
+            sheet.merge_range(title_row, 10, title_row, 9 + actual_month_count, "Monthly Actual", header)
         budget_month_start = 10 + actual_month_count
         if budget_month_count:
             sheet.merge_range(
-                0, budget_month_start, 0, budget_month_start + budget_month_count - 1,
+                title_row, budget_month_start, title_row, budget_month_start + budget_month_count - 1,
                 "Monthly Budget", header,
             )
         ytd_budget_start = budget_month_start + budget_month_count
         sheet.merge_range(
-            0,
+            title_row,
             ytd_budget_start,
-            0,
+            title_row,
             ytd_budget_start + 3,
             print_options["vhg_summary_ytd_budget_label"],
             header,
@@ -104,19 +134,86 @@ class AccountReport(models.Model):
         subheaders = columns[:6] + columns[7:]
         subheader_positions = list(range(6)) + list(range(8, 8 + len(columns) - 7))
         for x, column in zip(subheader_positions, subheaders):
-            sheet.write(1, x, column["name"], header)
+            sheet.write(title_row + 1, x, column["name"], header)
         labels = columns[:7] + [{"name": "Particular"}] + columns[7:]
         sheet.set_column(0, len(labels) - 1, 14)
         sheet.set_column(7, 7, 34)
 
-        for y, line in enumerate(lines, start=2):
+        for y, line in enumerate(lines, start=title_row + 2):
             is_total = line.get("level") == 0
             values = line["columns"][:7] + [{"no_format": line["name"], "figure_type": "string"}] + line["columns"][7:]
             self._write_vhg_summary_xlsx_row(
                 sheet, y, values, is_total,
                 text, total_text, number, total_number, percentage, total_percentage,
-                monetary_factor,
+                yellow_text, yellow_number, yellow_percentage,
+                green_text, green_number, green_percentage, monetary_factor,
+                line["name"],
             )
+
+    def _inject_vhg_notes_xlsx(
+        self, options, workbook, sheet, lines, header, text, total_text,
+        number, total_number, percentage, total_percentage,
+        yellow_text, yellow_number, yellow_percentage,
+        green_text, green_number, green_percentage, monetary_factor,
+    ):
+        columns = options["columns"]
+        title_row = self._write_vhg_xlsx_title(options, workbook, sheet, len(columns), self.name)
+        header_rows = options["vhg_notes_header_rows"]
+        first_header_row = title_row
+        last_header_row = first_header_row + len(header_rows)
+        sheet.merge_range(first_header_row, 0, last_header_row, 0, "Particular", header)
+        for row_offset, header_row in enumerate(header_rows):
+            x_offset = 1
+            for group_header in header_row:
+                colspan = group_header.get("colspan", 1)
+                rowspan = group_header.get("rowspan", 1)
+                row = first_header_row + row_offset
+                sheet.merge_range(
+                    row, x_offset, row + rowspan - 1, x_offset + colspan - 1,
+                    group_header["name"], header,
+                )
+                x_offset += colspan
+        for x, column in enumerate(columns, start=1):
+            sheet.write(last_header_row, x, column["name"], header)
+        sheet.set_column(0, 0, 38)
+        sheet.set_column(1, len(columns), 18)
+        for y, line in enumerate(lines, start=last_header_row + 1):
+            values = [{"no_format": line["name"], "figure_type": "string"}, *line["columns"]]
+            self._write_vhg_summary_xlsx_row(
+                sheet, y, values, line.get("level") == 0,
+                text, total_text, number, total_number, percentage, total_percentage,
+                yellow_text, yellow_number, yellow_percentage,
+                green_text, green_number, green_percentage, monetary_factor,
+                line["name"],
+            )
+
+    def _write_vhg_xlsx_title(self, options, workbook, sheet, last_column, report_name):
+        title = workbook.add_format({"bold": True, "font_size": 12, "align": "center"})
+        company = workbook.add_format({"bold": True, "align": "center"})
+        unit = workbook.add_format({"bold": True, "align": "right"})
+        company_ids = self.get_report_company_ids(options)
+        companies = self.env["res.company"].browse(company_ids)
+        company_names = ", ".join(companies.mapped("name")) or self.env.company.name
+        currency = companies[:1].currency_id or self.env.company.currency_id
+        currency_name = "Kyats" if currency.name == "MMK" else currency.name
+        unit_name = {
+            "thousands": "Thousand",
+            "lakhs": "Lakh",
+            "millions": "Million",
+        }.get(options.get("rounding_unit"), "")
+        unit_label = f"{currency_name} in {unit_name}" if unit_name else currency_name
+        if last_column > 1:
+            company_end = last_column - 2
+            if company_end:
+                sheet.merge_range(0, 0, 0, company_end, company_names, company)
+            else:
+                sheet.write(0, 0, company_names, company)
+            sheet.merge_range(0, last_column - 1, 0, last_column, unit_label, unit)
+        else:
+            sheet.write(0, 0, company_names, company)
+            sheet.write(0, last_column, unit_label, unit)
+        sheet.merge_range(1, 0, 1, last_column, report_name, title)
+        return 3
 
     @staticmethod
     def _vhg_xlsx_rounding_factor(options):
@@ -130,17 +227,32 @@ class AccountReport(models.Model):
     def _write_vhg_summary_xlsx_row(
         sheet, y, values, is_total,
         text, total_text, number, total_number, percentage, total_percentage,
-        monetary_factor,
+        yellow_text, yellow_number, yellow_percentage,
+        green_text, green_number, green_percentage, monetary_factor, line_name,
     ):
+        yellow_total_names = {"Net Revenues", "Total Net Revenues", "Net Operating Revenue"}
+        green_total_names = {
+            "Total Expenses", "EBITDA", "EBIT", "Earnings Before Tax", "Earnings After Tax",
+        }
+        row_formats = (
+            (yellow_text, yellow_number, yellow_percentage)
+            if line_name in yellow_total_names
+            else (green_text, green_number, green_percentage)
+            if line_name in green_total_names
+            else (total_text, total_number, total_percentage)
+            if is_total
+            else (text, number, percentage)
+        )
+        text_format, number_format, percentage_format = row_formats
         for x, cell in enumerate(values):
             value = cell.get("no_format")
             figure_type = cell.get("figure_type")
             if figure_type == "percentage" and value is not None:
                 value /= 100.0
-                cell_format = total_percentage if is_total else percentage
+                cell_format = percentage_format
             elif isinstance(value, (int, float)):
                 value /= monetary_factor
-                cell_format = total_number if is_total else number
+                cell_format = number_format
             else:
-                cell_format = total_text if is_total else text
+                cell_format = text_format
             sheet.write(y, x, value if value is not None else "", cell_format)
