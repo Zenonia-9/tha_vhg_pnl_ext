@@ -41,23 +41,25 @@ class AccountReport(models.Model):
         print_options = self.get_options({**options, "export_mode": "file"})
         lines = self._get_lines(print_options)
         header = workbook.add_format({
-            "bold": True, "border": 1, "align": "center", "valign": "vcenter",
-            "bg_color": "#FFF2CC",
+            "bold": True, "border": 1, "border_color": "#B4C7E7",
+            "align": "center", "valign": "vcenter", "font_color": "#FFFFFF",
+            "bg_color": "#1F4E78",
         })
-        text = workbook.add_format({"border": 1})
-        total_text = workbook.add_format({"border": 1, "bold": True})
-        number = workbook.add_format({"border": 1, "num_format": "#,##0.00"})
-        total_number = workbook.add_format({"border": 1, "bold": True, "num_format": "#,##0.00"})
-        percentage = workbook.add_format({"border": 1, "num_format": "0.00%"})
-        total_percentage = workbook.add_format({"border": 1, "bold": True, "num_format": "0.00%"})
-        yellow_text = workbook.add_format({"border": 1, "bold": True, "bg_color": "#FFFF00"})
-        yellow_number = workbook.add_format({
-            "border": 1, "bold": True, "bg_color": "#FFFF00", "num_format": "#,##0.00",
+        text = workbook.add_format({"border": 1, "border_color": "#D9E2F3"})
+        total_text = workbook.add_format({
+            "border": 1, "border_color": "#A9D18E", "bold": True,
+            "font_color": "#1E4D2B", "bg_color": "#E2F0D9",
         })
-        yellow_percentage = workbook.add_format({
-            "border": 1, "bold": True, "bg_color": "#FFFF00", "num_format": "0.00%",
+        number = workbook.add_format({"border": 1, "border_color": "#D9E2F3", "num_format": "#,##0.00"})
+        total_number = workbook.add_format({
+            "border": 1, "border_color": "#A9D18E", "bold": True,
+            "font_color": "#1E4D2B", "bg_color": "#E2F0D9", "num_format": "#,##0.00",
         })
-        green_text = workbook.add_format({"border": 1, "bold": True, "bg_color": "#A9D18E"})
+        percentage = workbook.add_format({"border": 1, "border_color": "#D9E2F3", "num_format": "0.00%"})
+        total_percentage = workbook.add_format({
+            "border": 1, "border_color": "#A9D18E", "bold": True,
+            "font_color": "#1E4D2B", "bg_color": "#E2F0D9", "num_format": "0.00%",
+        })
         green_number = workbook.add_format({
             "border": 1, "bold": True, "bg_color": "#A9D18E", "num_format": "#,##0.00",
         })
@@ -71,8 +73,7 @@ class AccountReport(models.Model):
             return self._inject_vhg_notes_xlsx(
                 print_options, workbook, sheet, lines, header, text, total_text,
                 number, total_number, percentage, total_percentage,
-                yellow_text, yellow_number, yellow_percentage,
-                green_text, green_number, green_percentage, monetary_factor,
+                monetary_factor,
             )
 
         title_row = self._write_vhg_xlsx_title(
@@ -102,8 +103,7 @@ class AccountReport(models.Model):
                 self._write_vhg_summary_xlsx_row(
                     sheet, y, values, is_total,
                     text, total_text, number, total_number, percentage, total_percentage,
-                    yellow_text, yellow_number, yellow_percentage,
-                    green_text, green_number, green_percentage, monetary_factor,
+                    monetary_factor,
                     line["name"],
                 )
             return
@@ -145,16 +145,14 @@ class AccountReport(models.Model):
             self._write_vhg_summary_xlsx_row(
                 sheet, y, values, is_total,
                 text, total_text, number, total_number, percentage, total_percentage,
-                yellow_text, yellow_number, yellow_percentage,
-                green_text, green_number, green_percentage, monetary_factor,
+                monetary_factor,
                 line["name"],
             )
 
     def _inject_vhg_notes_xlsx(
         self, options, workbook, sheet, lines, header, text, total_text,
         number, total_number, percentage, total_percentage,
-        yellow_text, yellow_number, yellow_percentage,
-        green_text, green_number, green_percentage, monetary_factor,
+        monetary_factor,
     ):
         columns = options["columns"]
         title_row = self._write_vhg_xlsx_title(options, workbook, sheet, len(columns), self.name)
@@ -182,8 +180,7 @@ class AccountReport(models.Model):
             self._write_vhg_summary_xlsx_row(
                 sheet, y, values, line.get("level") == 0,
                 text, total_text, number, total_number, percentage, total_percentage,
-                yellow_text, yellow_number, yellow_percentage,
-                green_text, green_number, green_percentage, monetary_factor,
+                monetary_factor,
                 line["name"],
             )
 
@@ -227,20 +224,11 @@ class AccountReport(models.Model):
     def _write_vhg_summary_xlsx_row(
         sheet, y, values, is_total,
         text, total_text, number, total_number, percentage, total_percentage,
-        yellow_text, yellow_number, yellow_percentage,
-        green_text, green_number, green_percentage, monetary_factor, line_name,
+        monetary_factor, line_name,
     ):
-        yellow_total_names = {"Net Revenues", "Total Net Revenues", "Net Operating Revenue"}
-        green_total_names = {
-            "Total Expenses", "EBITDA", "EBIT", "Earnings Before Tax", "Earnings After Tax",
-        }
         row_formats = (
-            (yellow_text, yellow_number, yellow_percentage)
-            if line_name in yellow_total_names
-            else (green_text, green_number, green_percentage)
-            if line_name in green_total_names
-            else (total_text, total_number, total_percentage)
-            if is_total
+            (total_text, total_number, total_percentage)
+            if is_total or line_name.startswith("Total ")
             else (text, number, percentage)
         )
         text_format, number_format, percentage_format = row_formats
