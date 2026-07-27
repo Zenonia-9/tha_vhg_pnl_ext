@@ -10,14 +10,16 @@
 
     tr[data-id="column_headers_row"] th {
         border: 1px solid var(--border-color, #45495a) !important;
-        font-weight: 700;
+        color: var(--o-account-reports-header-color, #212529) !important;
+        font-weight: 700 !important;
         text-align: center !important;
         vertical-align: middle;
     }
 
     tr[data-id="column_subheaders_row"] th {
         border: 1px solid var(--border-color, #45495a) !important;
-        font-weight: 600;
+        color: var(--o-account-reports-header-color, #212529) !important;
+        font-weight: 700 !important;
         text-align: center !important;
         vertical-align: middle;
     }
