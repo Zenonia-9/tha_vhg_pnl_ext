@@ -32,22 +32,22 @@ assert all("By F&A" not in name for name in group_names)
 assert group_names.index("Sales & Marketing") < group_names.index("Commission Expense")
 assert group_names.index("Commission Expense") < group_names.index("Taxes")
 
-assert len(options["columns"]) == 9
-assert sum(header.get("colspan", 1) for header in options["column_headers"][0]) == 9
+assert len(options["columns"]) == 10
+assert sum(header.get("colspan", 1) for header in options["column_headers"][0]) == 10
 assert [header["name"] for header in options["column_headers"][0]] == [
     "Jun - Jul Total", "Jul 2026", "Jun 2026",
 ]
-assert [header["colspan"] for header in options["column_headers"][0]] == [1, 4, 4]
-assert all(len(line["columns"]) == 9 for line in lines)
-assert options["columns"][4]["name"] == "%"
-assert options["columns"][4]["figure_type"] == "percentage"
+assert [header["colspan"] for header in options["column_headers"][0]] == [2, 4, 4]
+assert all(len(line["columns"]) == 10 for line in lines)
+assert options["columns"][0]["name"] == "%"
+assert options["columns"][0]["figure_type"] == "percentage"
 
 outpatient = next(line for line in lines if line["name"] == "Outpatient (Revenue)")
-assert outpatient["columns"][0]["no_format"] == (
-    outpatient["columns"][2]["no_format"] + outpatient["columns"][6]["no_format"]
+assert outpatient["columns"][1]["no_format"] == (
+    outpatient["columns"][3]["no_format"] + outpatient["columns"][7]["no_format"]
 )
-assert outpatient["columns"][4]["name"].endswith("%")
-assert outpatient["columns"][4]["name"] != outpatient["columns"][2]["name"]
+assert outpatient["columns"][5]["name"].endswith("%")
+assert outpatient["columns"][5]["name"] != outpatient["columns"][3]["name"]
 
 unfolded_options = report.get_options({
     "date": options["date"],
@@ -68,15 +68,16 @@ assert bank_parent["name"] == "Finance Expenses"
 assert fx_parent["name"] == "Finance Expenses"
 expected_budget_percentage = report._compute_column_percent_comparison_data(
     unfolded_options,
-    bone_dxa["columns"][2]["no_format"],
     bone_dxa["columns"][3]["no_format"],
-    green_on_positive=bone_dxa["columns"][2]["green_on_positive"],
+    bone_dxa["columns"][4]["no_format"],
+    green_on_positive=bone_dxa["columns"][3]["green_on_positive"],
 )
-assert bone_dxa["columns"][4]["name"] == expected_budget_percentage["name"]
-assert bone_dxa["columns"][4]["comparison_mode"] == expected_budget_percentage["mode"]
-assert bone_dxa["columns"][4]["figure_type"] == "string"
-assert bone_dxa["columns"][1]["name"].endswith("%")
-assert bone_dxa["columns"][5]["name"].endswith("%")
+assert bone_dxa["columns"][5]["name"] == expected_budget_percentage["name"]
+assert bone_dxa["columns"][5]["comparison_mode"] == expected_budget_percentage["mode"]
+assert bone_dxa["columns"][5]["figure_type"] == "string"
+assert bone_dxa["columns"][0]["name"].endswith("%")
+assert bone_dxa["columns"][2]["name"].endswith("%")
+assert bone_dxa["columns"][6]["name"].endswith("%")
 
 million_options = report.get_options({
     "date": options["date"],
@@ -86,8 +87,8 @@ million_options = report.get_options({
 })
 million_lines = report._get_lines(million_options)
 million_outpatient = next(line for line in million_lines if line["name"] == "Outpatient (Revenue)")
-assert million_outpatient["columns"][1]["name"] == outpatient["columns"][1]["name"]
-assert million_outpatient["columns"][4]["name"] == outpatient["columns"][4]["name"]
+assert million_outpatient["columns"][2]["name"] == outpatient["columns"][2]["name"]
+assert million_outpatient["columns"][5]["name"] == outpatient["columns"][5]["name"]
 
 taxes = next(line for line in lines if line["name"] == "Taxes")
 total_expenses = next(line for line in lines if line["name"] == "Total Expenses")
@@ -114,6 +115,29 @@ pdf = report.export_to_pdf(options)
 assert len(xlsx["file_content"]) > 1000
 assert len(pdf["file_content"]) > 1000
 
+native_xlsx_options = report.get_options({
+    "date": options["date"],
+    "comparison": {"filter": "previous_period", "number_period": 1},
+    "budgets": [{"id": budget.id, "selected": True}],
+    "export_mode": "file",
+    "unfold_all": True,
+    "vhg_notes_native_xlsx": True,
+})
+native_xlsx_options["unfold_all"] = True
+native_xlsx_options["vhg_notes_native_xlsx"] = True
+native_xlsx_lines = report._get_lines(native_xlsx_options)
+inpatient_header = next(
+    line for line in native_xlsx_lines if line["name"] == "Inpatient (Revenue)"
+)
+inpatient_total = next(
+    line for line in native_xlsx_lines if line["name"] == "Total Inpatient (Revenue)"
+)
+assert sum(
+    line["name"] == "Total Inpatient (Revenue)" for line in native_xlsx_lines
+) == 1
+assert all(not column["name"] for column in inpatient_header["columns"])
+assert inpatient_total["columns"][1]["no_format"] is not None
+
 options_without_budget = report.get_options({
     "date": {
         "date_from": "2026-07-01",
@@ -125,19 +149,19 @@ options_without_budget = report.get_options({
     "budgets": [],
 })
 lines_without_budget = report._get_lines(options_without_budget)
-assert len(options_without_budget["columns"]) == 5
+assert len(options_without_budget["columns"]) == 6
 assert sum(
     header.get("colspan", 1)
     for header in options_without_budget["column_headers"][0]
-) == 5
-assert all(len(line["columns"]) == 5 for line in lines_without_budget)
+) == 6
+assert all(len(line["columns"]) == 6 for line in lines_without_budget)
 
 print({
     "columns": len(options["columns"]),
     "header_colspan": sum(header.get("colspan", 1) for header in options["column_headers"][0]),
     "headers": [(header["name"], header["colspan"]) for header in options["column_headers"][0]],
-    "outpatient_period_total": outpatient["columns"][0]["no_format"],
-    "bone_dxa_budget_percentage": bone_dxa["columns"][4]["name"],
+    "outpatient_period_total": outpatient["columns"][1]["no_format"],
+    "bone_dxa_budget_percentage": bone_dxa["columns"][5]["name"],
     "columns_without_budget": len(options_without_budget["columns"]),
     "xlsx_bytes": len(xlsx["file_content"]),
     "pdf_bytes": len(pdf["file_content"]),

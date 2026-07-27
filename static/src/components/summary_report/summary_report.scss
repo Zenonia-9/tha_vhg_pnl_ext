@@ -38,3 +38,15 @@
         min-width: 270px;
     }
 }
+
+.o_action.account_report {
+    tr[data-id="report_title_row"] th.o_vhg_notes_report_title {
+        border: 0 !important;
+        color: var(--AccountReport-muted-data-color, inherit) !important;
+        font-size: 0.875rem;
+        font-weight: 500 !important;
+        line-height: 1.5;
+        padding: 8px 14px 12px;
+        text-align: left !important;
+    }
+}

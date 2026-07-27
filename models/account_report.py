@@ -6,6 +6,29 @@ from odoo import models
 class AccountReport(models.Model):
     _inherit = "account.report"
 
+    def _get_lines(self, options, all_column_groups_expression_totals=None, warnings=None):
+        lines = super()._get_lines(
+            options,
+            all_column_groups_expression_totals=all_column_groups_expression_totals,
+            warnings=warnings,
+        )
+        notes_report = self.env.ref(
+            "tha_vhg_pnl_ext.report_vhg_profit_and_loss", raise_if_not_found=False
+        )
+        if self == notes_report and options.get("vhg_notes_native_xlsx"):
+            for line in lines:
+                if line.get("level") == 1 and line.get("unfoldable"):
+                    line["columns"] = [
+                        {
+                            **column,
+                            "name": "",
+                            "no_format": None,
+                            "comparison_mode": None,
+                        }
+                        for column in line["columns"]
+                    ]
+        return lines
+
     def _init_options_horizontal_groups(self, options, previous_options):
         super()._init_options_horizontal_groups(options, previous_options)
         notes_report = self.env.ref(
@@ -70,10 +93,24 @@ class AccountReport(models.Model):
         columns = print_options["columns"]
         monetary_factor = self._vhg_xlsx_rounding_factor(print_options)
         if self == notes_report:
-            return self._inject_vhg_notes_xlsx(
-                print_options, workbook, sheet, lines, header, text, total_text,
-                number, total_number, percentage, total_percentage,
-                monetary_factor,
+            native_options = {
+                **print_options,
+                "unfold_all": True,
+                "vhg_notes_native_xlsx": True,
+            }
+            native_options["column_headers"] = [
+                [{
+                    "name": print_options["vhg_notes_company_names"],
+                    "colspan": len(columns),
+                }],
+                [{
+                    "name": print_options["vhg_notes_report_title"],
+                    "colspan": len(columns),
+                }],
+                *print_options["column_headers"],
+            ]
+            return super()._inject_report_into_xlsx_sheet(
+                native_options, workbook, sheet
             )
 
         title_row = self._write_vhg_xlsx_title(
@@ -149,41 +186,6 @@ class AccountReport(models.Model):
                 line["name"],
             )
 
-    def _inject_vhg_notes_xlsx(
-        self, options, workbook, sheet, lines, header, text, total_text,
-        number, total_number, percentage, total_percentage,
-        monetary_factor,
-    ):
-        columns = options["columns"]
-        title_row = self._write_vhg_xlsx_title(options, workbook, sheet, len(columns), self.name)
-        header_rows = options["vhg_notes_header_rows"]
-        first_header_row = title_row
-        last_header_row = first_header_row + len(header_rows)
-        sheet.merge_range(first_header_row, 0, last_header_row, 0, "Particular", header)
-        for row_offset, header_row in enumerate(header_rows):
-            x_offset = 1
-            for group_header in header_row:
-                colspan = group_header.get("colspan", 1)
-                rowspan = group_header.get("rowspan", 1)
-                row = first_header_row + row_offset
-                sheet.merge_range(
-                    row, x_offset, row + rowspan - 1, x_offset + colspan - 1,
-                    group_header["name"], header,
-                )
-                x_offset += colspan
-        for x, column in enumerate(columns, start=1):
-            sheet.write(last_header_row, x, column["name"], header)
-        sheet.set_column(0, 0, 38)
-        sheet.set_column(1, len(columns), 18)
-        for y, line in enumerate(lines, start=last_header_row + 1):
-            values = [{"no_format": line["name"], "figure_type": "string"}, *line["columns"]]
-            self._write_vhg_summary_xlsx_row(
-                sheet, y, values, line.get("level") == 0,
-                text, total_text, number, total_number, percentage, total_percentage,
-                monetary_factor,
-                line["name"],
-            )
-
     def _write_vhg_xlsx_title(self, options, workbook, sheet, last_column, report_name):
         title = workbook.add_format({"bold": True, "font_size": 12, "align": "center"})
         company = workbook.add_format({"bold": True, "align": "center"})
@@ -209,7 +211,12 @@ class AccountReport(models.Model):
         else:
             sheet.write(0, 0, company_names, company)
             sheet.write(0, last_column, unit_label, unit)
-        sheet.merge_range(1, 0, 1, last_column, report_name, title)
+        report_title = (
+            options.get("vhg_summary_xlsx_report_title")
+            or options.get("vhg_notes_report_title")
+            or report_name
+        )
+        sheet.merge_range(1, 0, 1, last_column, report_title, title)
         return 3
 
     @staticmethod

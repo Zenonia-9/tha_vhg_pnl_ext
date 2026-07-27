@@ -2,16 +2,19 @@
 <templates xml:space="preserve">
     <t t-name="tha_vhg_pnl_ext.NotesReportHeader">
         <thead id="table_header" class="sticky">
+            <tr data-id="report_title_row">
+                <th
+                    class="o_vhg_notes_report_title"
+                    t-att-colspan="controller.options.columns.length + 1"
+                >
+                    <span t-out="controller.options.vhg_notes_company_names"/>
+                    <br/>
+                    <span t-out="controller.options.vhg_notes_report_title"/>
+                </th>
+            </tr>
             <t t-foreach="controller.options.vhg_notes_header_rows" t-as="headerRow" t-key="headerRow_index">
                 <tr data-id="column_headers_row">
-                    <th>
-                        <t t-if="headerRow_first and controller.options.companies.length > 1">
-                            <span
-                                class="companies_header"
-                                t-out="controller.options.companies.map(company => company.name).join(', ')"
-                            />
-                        </t>
-                    </th>
+                    <th/>
                     <t t-foreach="headerRow" t-as="header" t-key="header_index">
                         <th
                             class="column_header"

@@ -120,6 +120,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
     }
 
     def _custom_options_initializer(self, report, options, previous_options):
+        companies = self.env["res.company"].browse(report.get_report_company_ids(options))
+        options.update({
+            "vhg_notes_company_names": ", ".join(companies.mapped("name")) or self.env.company.name,
+            "vhg_notes_report_title": "MONTHLY PERFORMANCE FINANCIAL REPORTS (P&L Note)",
+        })
         horizontal_header_names = {}
         for header_level in options.get("column_headers", []):
             for header in header_level:
@@ -131,12 +136,15 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             column_group_key
             for column_group_key, column_group in options["column_groups"].items()
             if column_group.get("forced_options", {}).get("vhg_period_total")
+            or column_group.get("forced_options", {}).get("vhg_period_total_percent")
             or column_group.get("forced_options", {}).get("vhg_actual_percent")
         }
         options["columns"] = [
             column
             for column in options["columns"]
-            if column["expression_label"] not in ("period_total", "actual_percent")
+            if column["expression_label"] not in (
+                "period_total", "period_total_percent", "actual_percent",
+            )
             and column["column_group_key"] not in synthetic_column_group_keys
         ]
         options["column_groups"] = {
@@ -161,6 +169,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         has_previous_period_comparison = previous_period_count > 0
         options["vhg_period_total_enabled"] = has_previous_period_comparison
         period_total_column_group_key = "vhg_period_total"
+        period_total_percent_column_group_key = "vhg_period_total_percent"
         period_total_header = ""
         if has_previous_period_comparison:
             period_date_keys = {
@@ -196,6 +205,19 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         columns = []
         actual_percent_column_groups = {}
         if has_previous_period_comparison:
+            column_groups[period_total_percent_column_group_key] = {
+                "forced_options": {"vhg_period_total_percent": True},
+                "forced_domain": [],
+            }
+            columns.append({
+                "name": "%",
+                "column_group_key": period_total_percent_column_group_key,
+                "expression_label": "period_total_percent",
+                "sortable": False,
+                "figure_type": "percentage",
+                "blank_if_zero": False,
+                "style": "text-align: center; white-space: nowrap;",
+            })
             column_groups[period_total_column_group_key] = {
                 "forced_options": {"vhg_period_total": True},
                 "forced_domain": [],
@@ -285,9 +307,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
         top_headers = []
         if has_previous_period_comparison:
-            top_headers.append({"name": period_total_header, "colspan": 1})
+            top_headers.append({"name": period_total_header, "colspan": 2})
         for column in options["columns"]:
             if column["column_group_key"] == period_total_column_group_key:
+                continue
+            if column["column_group_key"] == period_total_percent_column_group_key:
                 continue
             forced_options = options["column_groups"][column["column_group_key"]]["forced_options"]
             column_date = forced_options.get("date", {})
@@ -314,6 +338,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             horizontal_headers = []
             for column in options["columns"]:
                 if column["column_group_key"] == period_total_column_group_key:
+                    continue
+                if column["column_group_key"] == period_total_percent_column_group_key:
                     continue
                 source_column_group_key = actual_percent_column_groups.get(
                     column["column_group_key"], column["column_group_key"]
@@ -394,6 +420,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         for column_group_key, column_options in report._split_options_per_column_group(options).items():
             if (
                 column_group_key == options.get("vhg_period_total_column_group_key")
+                or column_group_key == "vhg_period_total_percent"
                 or column_group_key in options.get("vhg_actual_percent_column_groups", {})
             ):
                 continue
@@ -473,6 +500,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         actual_percent_column_groups = options.get("vhg_actual_percent_column_groups", {})
         for column in options["columns"]:
             is_period_total = column["expression_label"] == "period_total"
+            is_period_total_percent = column["expression_label"] == "period_total_percent"
             is_actual_percent = column["expression_label"] == "actual_percent"
             budget_percentage_group_keys = budget_percentage_column_groups.get(column["column_group_key"])
             value = balances.get(column["column_group_key"], 0.0)
@@ -480,6 +508,12 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 value = sum(
                     balances.get(column_group_key, 0.0)
                     for column_group_key in options.get("vhg_period_total_balance_column_group_keys", ())
+                )
+            elif is_period_total_percent:
+                value = (
+                    self._period_total_percent(group_key, balances, group_balances, options)
+                    if group_key and group_balances
+                    else None
                 )
             elif is_actual_percent:
                 source_column_group_key = actual_percent_column_groups.get(column["column_group_key"])
@@ -519,14 +553,14 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             column_dict = report._build_column_dict(
                 value,
                 column,
-                options=percentage_options if is_actual_percent else options,
-                digits=2 if is_period_total or is_actual_percent else 1,
+                options=percentage_options if is_actual_percent or is_period_total_percent else options,
+                digits=2 if is_period_total or is_period_total_percent or is_actual_percent else 1,
             )
             if column["figure_type"] == "monetary":
                 column_dict = self._format_monetary_display(
                     report, options, value, column_dict
                 )
-            elif is_actual_percent:
+            elif is_actual_percent or is_period_total_percent:
                 formatted_percentage = report.format_value(
                     percentage_options,
                     value,
@@ -541,6 +575,22 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     })
             columns.append(column_dict)
         return columns
+
+    def _period_total_percent(self, group_key, balances, group_balances, options):
+        balance_column_group_keys = options.get(
+            "vhg_period_total_balance_column_group_keys", ()
+        )
+        denominator_groups = self._SHARED_PERCENTAGE_GROUPS.get(group_key, (group_key,))
+        numerator = sum(
+            balances.get(column_group_key, 0.0)
+            for column_group_key in balance_column_group_keys
+        )
+        denominator = sum(
+            group_balances[denominator_group][column_group_key]
+            for denominator_group in denominator_groups
+            for column_group_key in balance_column_group_keys
+        )
+        return numerator * 100.0 / denominator if denominator else None
 
     def _actual_percent(self, group_key, balances, group_balances, column_group_key):
         denominator_groups = self._SHARED_PERCENTAGE_GROUPS.get(group_key, (group_key,))

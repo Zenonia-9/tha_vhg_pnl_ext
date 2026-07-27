@@ -73,6 +73,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 f"Management Profit and Loss Summary for Year "
                 f"{fiscal_start.year} - {fiscal_end.year}"
             ),
+            "vhg_summary_xlsx_report_title": (
+                f"Management Profit and Loss Summary for Year "
+                f"{fiscal_start.year} - {fiscal_end.year}"
+            ),
             "vhg_summary_mtd_label": f"Month to Date - {month_start:%b %Y}",
             "vhg_summary_ytd_actual_label": f"Year to Date Actual - {fiscal_start:%b} to {month_start:%b %Y}",
             "vhg_summary_ytd_budget_label": f"Year to Date Budget - {fiscal_start:%b} to {month_start:%b %Y}",
