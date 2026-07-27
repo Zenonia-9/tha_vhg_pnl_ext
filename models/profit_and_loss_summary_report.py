@@ -33,6 +33,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         month_start = selected_date.replace(day=1)
         month_end = month_start + relativedelta(months=1, days=-1)
         company = self.env["res.company"].browse(report.get_report_company_ids(options)[:1]) or self.env.company
+        companies = self.env["res.company"].browse(report.get_report_company_ids(options)) or company
         fiscal_dates = company.compute_fiscalyear_dates(selected_date)
         fiscal_start = fiscal_dates["date_from"].replace(day=1)
         fiscal_end = fiscal_dates["date_to"]
@@ -67,6 +68,11 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "vhg_summary_horizontal_mode": horizontal_mode,
             "vhg_summary_horizontal_entities": horizontal_entities,
             "vhg_summary_fiscal_label": f"FY {fiscal_start:%b %Y} - {fiscal_end:%b %Y}",
+            "vhg_summary_report_title": (
+                f"{', '.join(companies.mapped('name'))} "
+                f"Management Profit and Loss Summary for Year "
+                f"{fiscal_start.year} - {fiscal_end.year}"
+            ),
             "vhg_summary_mtd_label": f"Month to Date - {month_start:%b %Y}",
             "vhg_summary_ytd_actual_label": f"Year to Date Actual - {fiscal_start:%b} to {month_start:%b %Y}",
             "vhg_summary_ytd_budget_label": f"Year to Date Budget - {fiscal_start:%b} to {month_start:%b %Y}",
