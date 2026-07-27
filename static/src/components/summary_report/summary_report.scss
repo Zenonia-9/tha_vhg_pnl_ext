@@ -10,10 +10,10 @@
 
     tr[data-id="report_title_row"] th.o_vhg_summary_report_title {
         border: 0 !important;
-        color: var(--o-account-reports-header-color, #212529) !important;
-        font-size: 1.05rem;
-        font-weight: 700 !important;
-        padding: 12px 14px 16px;
+        color: var(--o-color-muted, #adb5bd) !important;
+        font-size: 0.875rem;
+        font-weight: 500 !important;
+        padding: 8px 14px 12px;
         text-align: left !important;
     }
 
