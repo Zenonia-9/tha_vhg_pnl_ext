@@ -133,5 +133,8 @@
                 </t>
             </t>
         </tr>
+        <tr t-if="props.line.level === 0" class="o_vhg_summary_spacer" aria-hidden="true">
+            <td t-att-colspan="controller.options.columns.length + 1"/>
+        </tr>
     </t>
 </templates>

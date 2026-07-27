@@ -37,6 +37,13 @@
     .o_account_report_line_name {
         min-width: 270px;
     }
+
+    tr.o_vhg_summary_spacer td {
+        background: transparent !important;
+        border: 0 !important;
+        height: 1rem;
+        padding: 0 !important;
+    }
 }
 
 .o_action.account_report {
