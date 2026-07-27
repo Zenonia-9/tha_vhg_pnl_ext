@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Reference-only lines for cross_report().  The handler keeps these out of
+        the rendered Notes report, which continues to use its approved dynamic rows.
+    -->
+    <record id="vhg_pnl_line_inpatient" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/>
+        <field name="name">Inpatient (Revenue)</field><field name="code">VHG_INPATIENT</field><field name="hierarchy_level">1</field><field name="sequence">10</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_inpatient_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_INPATIENT</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_outpatient" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Outpatient (Revenue)</field><field name="code">VHG_OUTPATIENT</field><field name="hierarchy_level">1</field><field name="sequence">20</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_outpatient_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_OUTPATIENT</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_eopd_day_care" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Other (EOPD, Day care)</field><field name="code">VHG_EOPD_DAY_CARE</field><field name="hierarchy_level">1</field><field name="sequence">30</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_eopd_day_care_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_EOPD_DAY_CARE</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_total_revenue" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Total Revenue</field><field name="code">VHG_TOTAL_REVENUE</field><field name="hierarchy_level">0</field><field name="sequence">40</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_total_revenue_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">aggregation</field><field name="formula">VHG_INPATIENT.balance + VHG_OUTPATIENT.balance + VHG_EOPD_DAY_CARE.balance</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_direct_cost" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Direct Cost</field><field name="code">VHG_DIRECT_COST</field><field name="hierarchy_level">1</field><field name="sequence">50</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_direct_cost_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_DIRECT_COST</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_net_revenues" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Net Revenues</field><field name="code">VHG_NET_REVENUES</field><field name="hierarchy_level">0</field><field name="sequence">60</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_net_revenues_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">aggregation</field><field name="formula">VHG_TOTAL_REVENUE.balance - VHG_DIRECT_COST.balance</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_other_hospital_revenue" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Other Hospital Revenue (Partnership Income)</field><field name="code">VHG_OTHER_HOSPITAL_REVENUE</field><field name="hierarchy_level">1</field><field name="sequence">70</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_other_hospital_revenue_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_OTHER_HOSPITAL_REVENUE</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_non_hospital_revenue" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Non Hospital Revenue (Rental &amp; Other)</field><field name="code">VHG_NON_HOSPITAL_REVENUE</field><field name="hierarchy_level">1</field><field name="sequence">80</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_non_hospital_revenue_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_NON_HOSPITAL_REVENUE</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_rental_complex" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Rental Complex Building &amp; BIS</field><field name="code">VHG_RENTAL_COMPLEX</field><field name="hierarchy_level">1</field><field name="sequence">90</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_rental_complex_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_RENTAL_COMPLEX</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_net_operating_revenue" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Net Operating Revenue</field><field name="code">VHG_NET_OPERATING_REVENUE</field><field name="hierarchy_level">0</field><field name="sequence">100</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_net_operating_revenue_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">aggregation</field><field name="formula">VHG_NET_REVENUES.balance + VHG_OTHER_HOSPITAL_REVENUE.balance + VHG_NON_HOSPITAL_REVENUE.balance + VHG_RENTAL_COMPLEX.balance</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_cost_of_goods_sold" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Cost of Goods Sold</field><field name="code">VHG_COST_OF_GOODS_SOLD</field><field name="hierarchy_level">1</field><field name="sequence">110</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_cost_of_goods_sold_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_COST_OF_GOODS_SOLD</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_operating_cost" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Operating Cost</field><field name="code">VHG_OPERATING_COST</field><field name="hierarchy_level">1</field><field name="sequence">120</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_operating_cost_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_OPERATING_COST</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_staff_cost" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Staff Cost (Based on Head Count)</field><field name="code">VHG_STAFF_COST</field><field name="hierarchy_level">1</field><field name="sequence">130</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_staff_cost_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_STAFF_COST</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_bonus" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Bonus</field><field name="code">VHG_BONUS</field><field name="hierarchy_level">1</field><field name="sequence">140</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_bonus_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_BONUS</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_administrative" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Administrative &amp; Other Expenses</field><field name="code">VHG_ADMINISTRATIVE</field><field name="hierarchy_level">1</field><field name="sequence">150</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_administrative_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_ADMINISTRATIVE</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_repair_maintenance" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Repair &amp; Maintenance</field><field name="code">VHG_REPAIR_MAINTENANCE</field><field name="hierarchy_level">1</field><field name="sequence">160</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_repair_maintenance_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_REPAIR_MAINTENANCE</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_sales_marketing" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Sales &amp; Marketing</field><field name="code">VHG_SALES_MARKETING</field><field name="hierarchy_level">1</field><field name="sequence">170</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_sales_marketing_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_SALES_MARKETING</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_commission_expense" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Commission Expense</field><field name="code">VHG_COMMISSION_EXPENSE</field><field name="hierarchy_level">1</field><field name="sequence">180</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_commission_expense_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_COMMISSION_EXPENSE</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_taxes" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Taxes</field><field name="code">VHG_TAXES</field><field name="hierarchy_level">1</field><field name="sequence">190</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_taxes_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_TAXES</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_total_expenses" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Total Expenses</field><field name="code">VHG_TOTAL_EXPENSES</field><field name="hierarchy_level">0</field><field name="sequence">200</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_total_expenses_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">aggregation</field><field name="formula">VHG_COST_OF_GOODS_SOLD.balance + VHG_OPERATING_COST.balance + VHG_STAFF_COST.balance + VHG_BONUS.balance + VHG_ADMINISTRATIVE.balance + VHG_REPAIR_MAINTENANCE.balance + VHG_SALES_MARKETING.balance + VHG_COMMISSION_EXPENSE.balance + VHG_TAXES.balance</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_ebitda" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">EBITDA</field><field name="code">VHG_EBITDA</field><field name="hierarchy_level">0</field><field name="sequence">210</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_ebitda_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">aggregation</field><field name="formula">VHG_NET_OPERATING_REVENUE.balance - VHG_TOTAL_EXPENSES.balance</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_depreciation" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Depreciation &amp; Amortization</field><field name="code">VHG_DEPRECIATION</field><field name="hierarchy_level">1</field><field name="sequence">220</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_depreciation_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_DEPRECIATION</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_ebit" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">EBIT</field><field name="code">VHG_EBIT</field><field name="hierarchy_level">0</field><field name="sequence">230</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_ebit_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">aggregation</field><field name="formula">VHG_EBITDA.balance - VHG_DEPRECIATION.balance</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_interest_income" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Interest Income</field><field name="code">VHG_INTEREST_INCOME</field><field name="hierarchy_level">1</field><field name="sequence">240</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_interest_income_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_INTEREST_INCOME</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_finance_expenses" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Finance Expenses</field><field name="code">VHG_FINANCE_EXPENSES</field><field name="hierarchy_level">1</field><field name="sequence">250</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_finance_expenses_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_FINANCE_EXPENSES</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_earnings_before_tax" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Earnings Before Tax</field><field name="code">VHG_EARNINGS_BEFORE_TAX</field><field name="hierarchy_level">0</field><field name="sequence">260</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_earnings_before_tax_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">aggregation</field><field name="formula">VHG_EBIT.balance + VHG_INTEREST_INCOME.balance - VHG_FINANCE_EXPENSES.balance</field></record></field>
+    </record>
+    <record id="vhg_pnl_line_income_tax" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Income Tax</field><field name="code">VHG_INCOME_TAX</field><field name="hierarchy_level">1</field><field name="sequence">270</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_income_tax_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">custom</field><field name="formula">_report_custom_engine_vhg_pnl_reference</field><field name="subformula">VHG_INCOME_TAX</field><field name="green_on_positive" eval="False"/></record></field>
+    </record>
+    <record id="vhg_pnl_line_earnings_after_tax" model="account.report.line">
+        <field name="report_id" ref="report_vhg_profit_and_loss"/><field name="name">Earnings After Tax</field><field name="code">VHG_EARNINGS_AFTER_TAX</field><field name="hierarchy_level">0</field><field name="sequence">280</field>
+        <field name="expression_ids"><record id="vhg_pnl_line_earnings_after_tax_balance" model="account.report.expression"><field name="label">balance</field><field name="engine">aggregation</field><field name="formula">VHG_EARNINGS_BEFORE_TAX.balance - VHG_INCOME_TAX.balance</field></record></field>
+    </record>
+</odoo>

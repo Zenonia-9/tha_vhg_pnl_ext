@@ -119,6 +119,68 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         "bonus": ("staff_cost", "bonus"),
     }
 
+    # These codes are the stable public contract for cross_report references.
+    # Their values deliberately reuse the same balances as the dynamic P&L rows.
+    _REFERENCE_LINE_GROUPS = {
+        "VHG_INPATIENT": "inpatient",
+        "VHG_OUTPATIENT": "outpatient",
+        "VHG_EOPD_DAY_CARE": "eopd_day_care",
+        "VHG_DIRECT_COST": "direct_cost",
+        "VHG_OTHER_HOSPITAL_REVENUE": "other_hospital_revenue",
+        "VHG_NON_HOSPITAL_REVENUE": "non_hospital_revenue",
+        "VHG_RENTAL_COMPLEX": "rental_complex",
+        "VHG_COST_OF_GOODS_SOLD": "cost_of_goods_sold",
+        "VHG_OPERATING_COST": "operating_cost",
+        "VHG_STAFF_COST": "staff_cost",
+        "VHG_BONUS": "bonus",
+        "VHG_ADMINISTRATIVE": "administrative",
+        "VHG_REPAIR_MAINTENANCE": "repair_maintenance",
+        "VHG_SALES_MARKETING": "sales_marketing",
+        "VHG_COMMISSION_EXPENSE": "commission_expense",
+        "VHG_TAXES": "taxes",
+        "VHG_DEPRECIATION": "depreciation",
+        "VHG_INTEREST_INCOME": "interest_income",
+        "VHG_FINANCE_EXPENSES": "finance_expenses",
+        "VHG_INCOME_TAX": "income_tax",
+    }
+
+    def _report_custom_engine_vhg_pnl_reference(
+        self, expressions, options, date_scope, current_groupby, next_groupby,
+        offset=0, limit=None, warnings=None,
+    ):
+        """Supply reference-line values without changing the dynamic report output."""
+        if current_groupby or next_groupby:
+            raise ValueError("VHG P&L reference lines do not support groupby expansion.")
+
+        report = self.env["account.report"].browse(options["report_id"])
+        group_balances, _account_balances = self._query_group_balances(report, options)
+        column_group_key = options["owner_column_group"]
+        return {
+            expression.subformula: group_balances[
+                self._REFERENCE_LINE_GROUPS[expression.subformula]
+            ].get(column_group_key, 0.0)
+            for expression in expressions
+        }
+
+    def _custom_line_postprocessor(self, report, options, lines):
+        """Keep reference definitions available to other reports, but out of this display."""
+        reference_line_ids = report.line_ids.filtered(
+            lambda line: (line.code or "") in self._REFERENCE_LINE_GROUPS
+            or (line.code or "").startswith("VHG_TOTAL_")
+            or (line.code or "") in {
+                "VHG_NET_REVENUES", "VHG_NET_OPERATING_REVENUE", "VHG_EBITDA",
+                "VHG_EBIT", "VHG_EARNINGS_BEFORE_TAX", "VHG_EARNINGS_AFTER_TAX",
+            }
+        ).ids
+        if not reference_line_ids:
+            return lines
+
+        return [
+            line
+            for line in lines
+            if report._get_model_info_from_id(line["id"])[1] not in reference_line_ids
+        ]
+
     def _custom_options_initializer(self, report, options, previous_options):
         companies = self.env["res.company"].browse(report.get_report_company_ids(options))
         options.update({
@@ -416,8 +478,14 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "expense_direct_cost",
         ))]
         companies = self.env["res.company"]
+        owner_column_group = options.get("owner_column_group")
 
         for column_group_key, column_options in report._split_options_per_column_group(options).items():
+            # A static reference expression is evaluated one column group at a
+            # time.  Do not repeat the same account-balance query for every
+            # other group in that case.
+            if owner_column_group and column_group_key != owner_column_group:
+                continue
             if (
                 column_group_key == options.get("vhg_period_total_column_group_key")
                 or column_group_key == "vhg_period_total_percent"

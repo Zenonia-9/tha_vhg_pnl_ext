@@ -9,6 +9,7 @@
     "depends": ["account_reports", "analytic"],
     "data": [
         "data/profit_and_loss_report.xml",
+        "data/profit_and_loss_reference_lines.xml",
         "data/profit_and_loss_summary_report.xml",
         "report/profit_and_loss_summary_templates.xml",
     ],

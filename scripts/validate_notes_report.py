@@ -19,6 +19,13 @@ options = report.get_options({
 })
 lines = report._get_lines(options)
 
+# The VHG_* lines are a public cross_report contract.  They deliberately stay
+# out of the rendered Notes report, whose dynamic rows remain the display
+# source of truth.
+reference_lines = report.line_ids.filtered(lambda line: (line.code or "").startswith("VHG_"))
+assert len(reference_lines) == 28
+assert sum(line["name"] == "Total Revenue" for line in lines) == 1
+
 line_names = [line["name"] for line in lines]
 group_names = [
     line["name"] for line in lines
@@ -48,6 +55,20 @@ assert outpatient["columns"][1]["no_format"] == (
 )
 assert outpatient["columns"][5]["name"].endswith("%")
 assert outpatient["columns"][5]["name"] != outpatient["columns"][3]["name"]
+
+total_revenue = next(line for line in lines if line["name"] == "Total Revenue")
+actual_balance_column_group = options["columns"][3]["column_group_key"]
+reference_totals = report._compute_expression_totals_for_each_column_group(
+    reference_lines.expression_ids,
+    options,
+    col_groups_restrict=[actual_balance_column_group],
+)
+reference_total_revenue = reference_lines.filtered(
+    lambda line: line.code == "VHG_TOTAL_REVENUE"
+).expression_ids
+assert reference_totals[actual_balance_column_group][reference_total_revenue]["value"] == (
+    total_revenue["columns"][3]["no_format"]
+)
 
 unfolded_options = report.get_options({
     "date": options["date"],
