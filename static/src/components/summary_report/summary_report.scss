@@ -10,7 +10,7 @@
 
     tr[data-id="report_title_row"] th.o_vhg_summary_report_title {
         border: 0 !important;
-        color: var(--o-color-muted, #adb5bd) !important;
+        color: var(--AccountReport-muted-data-color, inherit) !important;
         font-size: 0.875rem;
         font-weight: 500 !important;
         padding: 8px 14px 12px;
@@ -18,16 +18,16 @@
     }
 
     tr[data-id="column_headers_row"] th {
-        border: 1px solid var(--border-color, #45495a) !important;
-        color: var(--o-account-reports-header-color, #212529) !important;
+        border: 1px solid var(--AccountFinancial-border-color, var(--border-color, #45495a)) !important;
+        color: inherit !important;
         font-weight: 700 !important;
         text-align: center !important;
         vertical-align: middle;
     }
 
     tr[data-id="column_subheaders_row"] th {
-        border: 1px solid var(--border-color, #45495a) !important;
-        color: var(--o-account-reports-header-color, #212529) !important;
+        border: 1px solid var(--AccountFinancial-border-color, var(--border-color, #45495a)) !important;
+        color: inherit !important;
         font-weight: 700 !important;
         text-align: center !important;
         vertical-align: middle;
