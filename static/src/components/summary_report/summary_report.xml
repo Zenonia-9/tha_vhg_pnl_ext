@@ -67,7 +67,18 @@
                     class="o_vhg_summary_report_title"
                     t-att-colspan="controller.options.columns.length"
                 >
-                    <t t-out="controller.options.vhg_summary_report_title"/>
+                    <t t-if="controller.options.vhg_summary_horizontal_mode">
+                        <span t-out="controller.options.vhg_summary_conso_company_name"/>
+                        <br/>
+                        <span t-out="controller.options.vhg_summary_conso_report_title"/>
+                        <br/>
+                        <span t-out="controller.options.vhg_summary_conso_period_title"/>
+                    </t>
+                    <t t-else="">
+                        <span t-out="controller.options.vhg_summary_company_names"/>
+                        <br/>
+                        <span t-out="controller.options.vhg_summary_report_title"/>
+                    </t>
                 </th>
             </tr>
             <t t-if="controller.options.vhg_summary_horizontal_mode">

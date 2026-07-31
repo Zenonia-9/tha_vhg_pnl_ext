@@ -79,6 +79,10 @@ budget_previous["budgets"] = [{"id": fy_budget.id, "selected": True}]
 budget_options = report.get_options(budget_previous)
 budget_lines = report._get_lines(budget_options)
 assert len(budget_lines) == 27
+assert budget_options["vhg_summary_company_names"] == company.name
+assert budget_options["vhg_summary_report_title"] == (
+    "Management Profit and Loss Summary for Year 2026 - 2027"
+)
 assert any(
     cell.get("no_format")
     for line in budget_lines
@@ -218,6 +222,11 @@ horizontal_lines = consolidated_report._get_lines(horizontal_options)
 entities = horizontal_options["vhg_summary_horizontal_entities"]
 assert horizontal_options["vhg_summary_horizontal_mode"] is True
 assert horizontal_options["selected_horizontal_group_id"] == horizontal_group.id
+assert horizontal_options["vhg_summary_conso_company_name"] == "VICTORIA HOSPITAL"
+assert horizontal_options["vhg_summary_conso_report_title"] == (
+    "Yearly Performance Financial & Operational Reports"
+)
+assert horizontal_options["vhg_summary_conso_period_title"] == "Financial Year (26-27) For July 2026"
 assert entities
 assert len(horizontal_options["columns"]) == 1 + (2 * len(entities)) + 6
 assert [column["name"] for column in horizontal_options["columns"][:3]] == [
@@ -273,12 +282,12 @@ horizontal_xlsx = consolidated_report.export_to_xlsx(horizontal_options)
 assert len(horizontal_xlsx["file_content"]) > 1000
 with ZipFile(BytesIO(horizontal_xlsx["file_content"])) as workbook:
     worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
-    assert b'A4:A5' in worksheet_xml
-    assert b'B4:B5' in worksheet_xml
+    assert b'A5:A6' in worksheet_xml
+    assert b'B5:B6' in worksheet_xml
     start = 3
     for header in horizontal_options["vhg_summary_horizontal_headers"]:
         end = start + header["colspan"] - 1
-        merged_range = f"{column_name(start)}4:{column_name(end)}4".encode()
+        merged_range = f"{column_name(start)}5:{column_name(end)}5".encode()
         if header["colspan"] > 1:
             assert merged_range in worksheet_xml, merged_range
         start = end + 1
@@ -288,7 +297,7 @@ with ZipFile(BytesIO(horizontal_expanded_xlsx["file_content"])) as workbook:
     start = 3
     for header in horizontal_expanded_options["vhg_summary_horizontal_headers"]:
         end = start + header["colspan"] - 1
-        merged_range = f"{column_name(start)}4:{column_name(end)}4".encode()
+        merged_range = f"{column_name(start)}5:{column_name(end)}5".encode()
         if header["colspan"] > 1:
             assert merged_range in worksheet_xml, merged_range
         start = end + 1

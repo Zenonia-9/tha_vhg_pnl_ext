@@ -68,14 +68,22 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "vhg_summary_horizontal_mode": horizontal_mode,
             "vhg_summary_horizontal_entities": horizontal_entities,
             "vhg_summary_fiscal_label": f"FY {fiscal_start:%b %Y} - {fiscal_end:%b %Y}",
+            "vhg_summary_company_names": ", ".join(companies.mapped("name")) or self.env.company.name,
             "vhg_summary_report_title": (
-                f"{', '.join(companies.mapped('name'))} "
                 f"Management Profit and Loss Summary for Year "
                 f"{fiscal_start.year} - {fiscal_end.year}"
             ),
             "vhg_summary_xlsx_report_title": (
                 f"Management Profit and Loss Summary for Year "
                 f"{fiscal_start.year} - {fiscal_end.year}"
+            ),
+            "vhg_summary_conso_company_name": "VICTORIA HOSPITAL",
+            "vhg_summary_conso_report_title": (
+                "Yearly Performance Financial & Operational Reports"
+            ),
+            "vhg_summary_conso_period_title": (
+                f"Financial Year ({fiscal_start:%y}-{fiscal_end:%y}) "
+                f"For {month_start:%B %Y}"
             ),
             "vhg_summary_mtd_label": f"Month to Date - {month_start:%b %Y}",
             "vhg_summary_ytd_actual_label": f"Year to Date Actual - {fiscal_start:%b} to {month_start:%b %Y}",

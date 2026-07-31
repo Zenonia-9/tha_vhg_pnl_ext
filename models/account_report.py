@@ -73,21 +73,25 @@ class AccountReport(models.Model):
             "border": 1, "border_color": "#A9D18E", "bold": True,
             "font_color": "#1E4D2B", "bg_color": "#E2F0D9",
         })
-        number = workbook.add_format({"border": 1, "border_color": "#D9E2F3", "num_format": "#,##0.00"})
+        number = workbook.add_format({
+            "border": 1, "border_color": "#D9E2F3", "align": "right", "num_format": "#,##0.00",
+        })
         total_number = workbook.add_format({
             "border": 1, "border_color": "#A9D18E", "bold": True,
-            "font_color": "#1E4D2B", "bg_color": "#E2F0D9", "num_format": "#,##0.00",
+            "font_color": "#1E4D2B", "bg_color": "#E2F0D9", "align": "right", "num_format": "#,##0.00",
         })
-        percentage = workbook.add_format({"border": 1, "border_color": "#D9E2F3", "num_format": "0.00%"})
+        percentage = workbook.add_format({
+            "border": 1, "border_color": "#D9E2F3", "align": "right", "num_format": "0.00%",
+        })
         total_percentage = workbook.add_format({
             "border": 1, "border_color": "#A9D18E", "bold": True,
-            "font_color": "#1E4D2B", "bg_color": "#E2F0D9", "num_format": "0.00%",
+            "font_color": "#1E4D2B", "bg_color": "#E2F0D9", "align": "right", "num_format": "0.00%",
         })
         green_number = workbook.add_format({
-            "border": 1, "bold": True, "bg_color": "#A9D18E", "num_format": "#,##0.00",
+            "border": 1, "bold": True, "bg_color": "#A9D18E", "align": "right", "num_format": "#,##0.00",
         })
         green_percentage = workbook.add_format({
-            "border": 1, "bold": True, "bg_color": "#A9D18E", "num_format": "0.00%",
+            "border": 1, "bold": True, "bg_color": "#A9D18E", "align": "right", "num_format": "0.00%",
         })
 
         columns = print_options["columns"]
@@ -201,6 +205,12 @@ class AccountReport(models.Model):
             "millions": "Million",
         }.get(options.get("rounding_unit"), "")
         unit_label = f"{currency_name} in {unit_name}" if unit_name else currency_name
+        if options.get("vhg_summary_horizontal_mode"):
+            sheet.merge_range(0, 0, 0, last_column, options["vhg_summary_conso_company_name"], company)
+            sheet.merge_range(1, 0, 1, last_column, options["vhg_summary_conso_report_title"], title)
+            sheet.merge_range(2, 0, 2, last_column, options["vhg_summary_conso_period_title"], title)
+            return 4
+
         if last_column > 1:
             company_end = last_column - 2
             if company_end:

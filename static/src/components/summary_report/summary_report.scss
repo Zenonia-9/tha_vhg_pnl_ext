@@ -8,6 +8,11 @@
         white-space: nowrap;
     }
 
+    td.line_cell.numeric,
+    td.line_cell.numeric .content {
+        text-align: right !important;
+    }
+
     tr[data-id="report_title_row"] th.o_vhg_summary_report_title {
         border: 0 !important;
         color: var(--AccountReport-muted-data-color, inherit) !important;
@@ -46,7 +51,12 @@
     }
 }
 
-.o_action.account_report {
+.o_action.account_report.o_vhg_pnl_notes {
+    td.line_cell.numeric,
+    td.line_cell.numeric .content {
+        text-align: right !important;
+    }
+
     tr[data-id="report_title_row"] th.o_vhg_notes_report_title {
         border: 0 !important;
         color: var(--AccountReport-muted-data-color, inherit) !important;

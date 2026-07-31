@@ -443,6 +443,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "pdf_export": {
                 "pdf_export_main_table_header": "tha_vhg_pnl_ext.notes_pdf_header",
             },
+            "css_custom_class": "o_vhg_pnl_notes",
         })
 
     @staticmethod

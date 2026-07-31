@@ -20,7 +20,7 @@
     </record>
 
     <record id="action_report_vhg_profit_and_loss" model="ir.actions.client">
-        <field name="name">Management Profit and Loss Notes</field>
+        <field name="name">Management Profit and Loss Notes &amp; Summary</field>
         <field name="tag">account_report</field>
         <field name="path">vhg-profit-and-loss-vtr</field>
         <field name="context" eval="{'report_id': ref('tha_vhg_pnl_ext.report_vhg_profit_and_loss')}"/>
@@ -35,7 +35,7 @@
 
     <menuitem
         id="menu_action_report_vhg_profit_and_loss"
-        name="Management Profit and Loss Notes"
+        name="Management Profit and Loss Notes &amp; Summary"
         action="action_report_vhg_profit_and_loss"
         parent="menu_vhg_management_reports"
         groups="account.group_account_readonly"
