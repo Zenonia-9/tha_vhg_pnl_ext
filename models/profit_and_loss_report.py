@@ -57,7 +57,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "700080", "700090", "700100", "700110", "700120", "700130",
             "700140", "700170", "700190", "700070", "700150",
             "700160", "700200", "700210", "700220", "702311", "701150",
-            "701160", "701173", "701175", "702315", "703085", "704055",
+            "701160", "701173", "701175", "702260", "702315", "703085", "704055",
         )),
         # 703060 Move to Repair & Maintenance
         ("staff_cost", "Staff Cost (Based on Head Count)", 1, (
@@ -92,7 +92,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         ("interest_income", "Interest Income", -1, ("500750",)),
         ("finance_expenses", "Finance Expenses", 1, (
             "706010", "706020", "706030", "706040", "706050", "706060",
-            "706070", "706080", "702260", "702270",
+            "706070", "706080", "702270",
         )),
         ("income_tax", "Income Tax", 1, ("707010",)),
     )

@@ -26,7 +26,7 @@
 | 6 | Non-Hospital Revenue | Revenue (-1) | 510500, 510510, 510515, 510520, 510530, 510535, 510540, 510575, 510565, 510545, 510555, 510505, 510560, 510570, 510580 |
 | 7 | Complex Building & BIS | Revenue (-1) | 510085, 510095, 510125, 510130 |
 | 8 | Cost of Goods Sold | Expense (+1) | 600050, 600060, 600070, 600080, 600090, 600100, 600110, 600120, 600130, 600140, 600150, 600170, 600160, 600190, 600200, 600210, 600220, 600181, 600182, 600183, 600184, 600185, 600186 |
-| 9 | Operating Cost | Expense (+1) | 700010, 700020, 700030, 700040, 700050, 700060, 700080, 700090, 700100, 700110, 700120, 700130, 700140, 700170, 700190, 700070, 700150, 700160, 700200, 700210, 700220, 702311, 701150, 701160, 701173, 701175, 702315, 703085, 704055 |
+| 9 | Operating Cost | Expense (+1) | 700010, 700020, 700030, 700040, 700050, 700060, 700080, 700090, 700100, 700110, 700120, 700130, 700140, 700170, 700190, 700070, 700150, 700160, 700200, 700210, 700220, 702311, 701150, 701160, 701173, 701175, 702260, 702315, 703085, 704055 |
 | 10 | Staff Cost (Based on Head Count) | Expense (+1) | 701010, 701030, 701040, 701050, 701060, 701070, 701080, 701090, 701100, 701110, 701120, 701130, 701140, 701170, 701171, 701172 |
 | 11 | Bonus | Expense (+1) | 701020 |
 | 12 | Administrative & Other Expenses | Expense (+1) | 702010, 702020, 702030, 702040, 702050, 702060, 702070, 702080, 702090, 702100, 702110, 702120, 702130, 702140, 702150, 702160, 702170, 702180, 702190, 702200, 702210, 702220, 702230, 702240, 702250, 702280, 702290, 702300, 702310 |
@@ -36,7 +36,7 @@
 | — | Taxes *(Notes only; see below)* | Expense (+1) | 707020, 707030, 700180 |
 | 15 | Depreciation & Amortization | Expense (+1) | 705010, 705020, 705030, 705040, 705050, 705060, 705070, 705080, 705090, 705100, 705110, 705120, 705130, 705140, 705150, 705160, 705170, 705180, 705111 |
 | — | Interest Income *(Notes only; part of Summary financial net)* | Revenue (-1) | 500750 |
-| 16 | Finance Expenses *(Notes); Financial Expense & Income (Summary)* | Expense (+1) | 706010, 706020, 706030, 706040, 706050, 706060, 706070, 706080, 702260, 702270 |
+| 16 | Finance Expenses *(Notes); Financial Expense & Income (Summary)* | Expense (+1) | 706010, 706020, 706030, 706040, 706050, 706060, 706070, 706080, 702270 |
 | 17 | Income Tax | Expense (+1) | 707010 |
 
 ### Current THA account-name examples
@@ -46,7 +46,7 @@ The P&L Notes unfolding is the full live name list. Important recently clarified
 | Code | Live THA account name | Group |
 |---:|---|---|
 | 704010 | Commission Expenses | Commission Expense |
-| 702260 | Foreign exchange losses | Finance Expenses |
+| 702260 | Foreign exchange losses | Operating Cost |
 | 702270 | Bank charges | Finance Expenses |
 | 707010 | Income Tax Expenses | Income Tax |
 | 707020 | Property Tax | Taxes |

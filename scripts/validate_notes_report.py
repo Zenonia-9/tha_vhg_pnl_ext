@@ -86,7 +86,7 @@ bank_parent = next(line for line in unfolded_lines if line["id"] == bank_charges
 fx_parent = next(line for line in unfolded_lines if line["id"] == fx_losses["parent_id"])
 assert commission_parent["name"] == "Commission Expense"
 assert bank_parent["name"] == "Finance Expenses"
-assert fx_parent["name"] == "Finance Expenses"
+assert fx_parent["name"] == "Operating Cost"
 expected_budget_percentage = report._compute_column_percent_comparison_data(
     unfolded_options,
     bone_dxa["columns"][3]["no_format"],
