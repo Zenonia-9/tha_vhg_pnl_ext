@@ -81,12 +81,17 @@ bone_dxa = next(line for line in unfolded_lines if line["name"] == "500010 Bone 
 commission = next(line for line in unfolded_lines if line["name"] == "704010 Commission Expenses")
 bank_charges = next(line for line in unfolded_lines if line["name"] == "702270 Bank charges")
 fx_losses = next(line for line in unfolded_lines if line["name"] == "702260 Foreign exchange losses")
+operating_cost_account = next(line for line in unfolded_lines if line["name"].startswith("700225 "))
 commission_parent = next(line for line in unfolded_lines if line["id"] == commission["parent_id"])
 bank_parent = next(line for line in unfolded_lines if line["id"] == bank_charges["parent_id"])
 fx_parent = next(line for line in unfolded_lines if line["id"] == fx_losses["parent_id"])
+operating_cost_account_parent = next(
+    line for line in unfolded_lines if line["id"] == operating_cost_account["parent_id"]
+)
 assert commission_parent["name"] == "Commission Expense"
 assert bank_parent["name"] == "Finance Expenses"
 assert fx_parent["name"] == "Operating Cost"
+assert operating_cost_account_parent["name"] == "Operating Cost"
 expected_budget_percentage = report._compute_column_percent_comparison_data(
     unfolded_options,
     bone_dxa["columns"][3]["no_format"],
