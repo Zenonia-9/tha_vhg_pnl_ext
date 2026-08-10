@@ -544,6 +544,31 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 result[column_group_key] -= value
         return result
 
+    def _earnings_before_tax(self, group_balances):
+        """Return the VHG-mapped EBT balances used by the Notes report."""
+        net_operating_revenue = self._combine(
+            group_balances,
+            additions=(
+                "outpatient", "eopd_day_care", "inpatient",
+                "other_hospital_revenue", "non_hospital_revenue", "rental_complex",
+            ),
+            deductions=("direct_cost",),
+        )
+        total_expenses = self._combine(group_balances, additions=self._OPERATING_EXPENSE_GROUPS)
+        ebitda = defaultdict(float, net_operating_revenue)
+        for column_group_key, value in total_expenses.items():
+            ebitda[column_group_key] -= value
+        ebit = defaultdict(float, ebitda)
+        for column_group_key, value in group_balances["depreciation"].items():
+            ebit[column_group_key] -= value
+
+        earnings_before_tax = defaultdict(float, ebit)
+        for column_group_key, value in group_balances["interest_income"].items():
+            earnings_before_tax[column_group_key] += value
+        for column_group_key, value in group_balances["finance_expenses"].items():
+            earnings_before_tax[column_group_key] -= value
+        return earnings_before_tax
+
     @staticmethod
     def _format_monetary_display(report, options, value, column_dict):
         rounding_factor = {
@@ -823,11 +848,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
         add_group("interest_income")
         add_group("finance_expenses")
-        earnings_before_tax = defaultdict(float, ebit)
-        for column_group_key, value in group_balances["interest_income"].items():
-            earnings_before_tax[column_group_key] += value
-        for column_group_key, value in group_balances["finance_expenses"].items():
-            earnings_before_tax[column_group_key] -= value
+        earnings_before_tax = self._earnings_before_tax(group_balances)
         lines.append((0, self._total_line(
             report, options, "earnings_before_tax", "Earnings Before Tax", earnings_before_tax,
         )))
