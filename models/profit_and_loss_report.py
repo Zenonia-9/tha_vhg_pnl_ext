@@ -222,6 +222,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             or column_group.get("forced_options", {}).get("vhg_period_total_percent")
             or column_group.get("forced_options", {}).get("vhg_actual_percent")
             or column_group.get("forced_options", {}).get("vhg_period_total_budget")
+            or column_group.get("forced_options", {}).get("vhg_period_total_budget_percent")
         }
         options["columns"] = [
             column
@@ -255,6 +256,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         period_total_column_group_key = "vhg_period_total"
         period_total_percent_column_group_key = "vhg_period_total_percent"
         period_total_budget_column_group_key = "vhg_period_total_budget"
+        period_total_budget_percent_column_group_key = "vhg_period_total_budget_percent"
         period_total_header = ""
         if has_previous_period_comparison:
             period_date_keys = {
@@ -328,6 +330,19 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     "figure_type": "monetary",
                     "blank_if_zero": False,
                 })
+                column_groups[period_total_budget_percent_column_group_key] = {
+                    "forced_options": {"vhg_period_total_budget_percent": True},
+                    "forced_domain": [],
+                }
+                columns.append({
+                    "name": "%",
+                    "column_group_key": period_total_budget_percent_column_group_key,
+                    "expression_label": "period_total_budget_percent",
+                    "sortable": False,
+                    "figure_type": "percentage",
+                    "blank_if_zero": False,
+                    "style": "text-align: center; white-space: nowrap;",
+                })
 
         for column in native_columns:
             column_group_key = column["column_group_key"]
@@ -397,7 +412,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         }
         for column in options["columns"]:
             column_group_key = column["column_group_key"]
-            if column_group_key in (period_total_column_group_key, period_total_budget_column_group_key):
+            if column_group_key in (period_total_column_group_key, period_total_budget_column_group_key, period_total_budget_percent_column_group_key):
                 continue
             forced_options = options["column_groups"][column_group_key]["forced_options"]
             if forced_options.get("compute_budget"):
@@ -423,10 +438,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
         top_headers = []
         if has_previous_period_comparison:
-            total_colspan = 3 if period_total_budget_column_group_key in options["column_groups"] else 2
+            total_colspan = 4 if period_total_budget_percent_column_group_key in options["column_groups"] else 2
             top_headers.append({"name": period_total_header, "colspan": total_colspan})
         for column in options["columns"]:
-            if column["column_group_key"] in (period_total_column_group_key, period_total_budget_column_group_key):
+            if column["column_group_key"] in (period_total_column_group_key, period_total_budget_column_group_key, period_total_budget_percent_column_group_key):
                 continue
             if column["column_group_key"] == period_total_percent_column_group_key:
                 continue
@@ -454,7 +469,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if selected_horizontal_group_id:
             horizontal_headers = []
             for column in options["columns"]:
-                if column["column_group_key"] in (period_total_column_group_key, period_total_budget_column_group_key):
+                if column["column_group_key"] in (period_total_column_group_key, period_total_budget_column_group_key, period_total_budget_percent_column_group_key):
                     continue
                 if column["column_group_key"] == period_total_percent_column_group_key:
                     continue
@@ -499,9 +514,12 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 if column_group_key == period_total_percent_column_group_key:
                     amount_headers.append({"name": "", "colspan": 1})
                 elif column_group_key == period_total_column_group_key:
-                    amount_headers.append({"name": "Amount", "colspan": 1})
-                elif column_group_key == period_total_budget_column_group_key:
-                    amount_headers.append({"name": "Budget", "colspan": 1})
+                    amount_headers.append({"name": "Amount", "colspan": 3})
+                elif column_group_key in (
+                    period_total_budget_column_group_key,
+                    period_total_budget_percent_column_group_key,
+                ):
+                    continue
                 elif column_group_key in budget_actual_column_group_keys:
                     amount_headers.append({"name": "Amount", "colspan": 3})
                 elif column_group_key in (
@@ -653,6 +671,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             is_period_total = column["expression_label"] == "period_total"
             is_period_total_percent = column["expression_label"] == "period_total_percent"
             is_period_total_budget = column["expression_label"] == "period_total_budget"
+            is_period_total_budget_percent = column["expression_label"] == "period_total_budget_percent"
             is_actual_percent = column["expression_label"] == "actual_percent"
             budget_percentage_group_keys = budget_percentage_column_groups.get(column["column_group_key"])
             value = balances.get(column["column_group_key"], 0.0)
@@ -666,6 +685,37 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     balances.get(column_group_key, 0.0)
                     for column_group_key in options.get("vhg_period_total_budget_balance_column_group_keys", ())
                 )
+            elif is_period_total_budget_percent:
+                actual_value = sum(
+                    balances.get(column_group_key, 0.0)
+                    for column_group_key in options.get("vhg_period_total_balance_column_group_keys", ())
+                )
+                budget_value = sum(
+                    balances.get(column_group_key, 0.0)
+                    for column_group_key in options.get("vhg_period_total_budget_balance_column_group_keys", ())
+                )
+                comparison = report._compute_column_percent_comparison_data(
+                    percentage_options,
+                    actual_value,
+                    budget_value,
+                    green_on_positive=self._green_on_positive_for_budget(group_key),
+                )
+                comparison["mode"] = self._budget_comparison_mode(
+                    actual_value,
+                    budget_value,
+                    self._green_on_positive_for_budget(group_key),
+                    comparison["mode"],
+                )
+                columns.append(report._build_column_dict(
+                    comparison["name"],
+                    {
+                        **column,
+                        "figure_type": "string",
+                        "comparison_mode": comparison["mode"],
+                    },
+                    options=options,
+                ))
+                continue
             elif is_period_total_percent:
                 value = (
                     self._period_total_percent(group_key, balances, group_balances, options)
@@ -720,7 +770,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     "green_on_positive": self._green_on_positive_for_budget(group_key),
                 },
                 options=percentage_options if is_actual_percent or is_period_total_percent else options,
-                digits=2 if is_period_total or is_period_total_percent or is_period_total_budget or is_actual_percent else 1,
+                digits=2 if is_period_total or is_period_total_percent or is_period_total_budget or is_period_total_budget_percent or is_actual_percent else 1,
             )
             column_dict["green_on_positive"] = self._green_on_positive_for_budget(group_key)
             if column["figure_type"] == "monetary":

@@ -39,35 +39,36 @@ assert all("By F&A" not in name for name in group_names)
 assert group_names.index("Sales & Marketing") < group_names.index("Commission Expense")
 assert group_names.index("Commission Expense") < group_names.index("Taxes")
 
-assert len(options["columns"]) == 11
-assert sum(header.get("colspan", 1) for header in options["column_headers"][0]) == 11
+assert len(options["columns"]) == 12
+assert sum(header.get("colspan", 1) for header in options["column_headers"][0]) == 12
 assert [header["name"] for header in options["column_headers"][0]] == [
     "Jun - Jul Total", "Jul 2026", "Jun 2026",
 ]
-assert [header["colspan"] for header in options["column_headers"][0]] == [3, 4, 4]
-assert all(len(line["columns"]) == 11 for line in lines)
+assert [header["colspan"] for header in options["column_headers"][0]] == [4, 4, 4]
+assert all(len(line["columns"]) == 12 for line in lines)
 assert options["columns"][0]["name"] == "%"
 assert options["columns"][0]["figure_type"] == "percentage"
 assert options["columns"][1]["name"] == "Amount"
 assert options["columns"][2]["name"] == "Budget"
-assert options["columns"][4]["name"] == "Actual"
-assert options["columns"][5]["name"] == "Budget"
-assert options["columns"][6]["name"] == "%"
+assert options["columns"][3]["name"] == "%"
+assert options["columns"][5]["name"] == "Actual"
+assert options["columns"][6]["name"] == "Budget"
+assert options["columns"][7]["name"] == "%"
 assert len(options["vhg_notes_header_rows"]) == 2
 assert [header["name"] for header in options["vhg_notes_header_rows"][1]] == [
-    "", "Amount", "Budget", "", "Amount", "", "Amount",
+    "", "Amount", "", "Amount", "", "Amount",
 ]
-assert sum(header["colspan"] for header in options["vhg_notes_header_rows"][1]) == 11
+assert sum(header["colspan"] for header in options["vhg_notes_header_rows"][1]) == 12
 
 outpatient = next(line for line in lines if line["name"] == "Outpatient (Revenue)")
 assert outpatient["columns"][1]["no_format"] == (
-    outpatient["columns"][4]["no_format"] + outpatient["columns"][8]["no_format"]
+    outpatient["columns"][5]["no_format"] + outpatient["columns"][9]["no_format"]
 )
-assert outpatient["columns"][6]["name"].endswith("%")
-assert outpatient["columns"][6]["name"] != outpatient["columns"][4]["name"]
+assert outpatient["columns"][7]["name"].endswith("%")
+assert outpatient["columns"][7]["name"] != outpatient["columns"][5]["name"]
 
 total_revenue = next(line for line in lines if line["name"] == "Total Revenue")
-actual_balance_column_group = options["columns"][4]["column_group_key"]
+actual_balance_column_group = options["columns"][5]["column_group_key"]
 reference_totals = report._compute_expression_totals_for_each_column_group(
     reference_lines.expression_ids,
     options,
@@ -77,7 +78,7 @@ reference_total_revenue = reference_lines.filtered(
     lambda line: line.code == "VHG_TOTAL_REVENUE"
 ).expression_ids
 assert reference_totals[actual_balance_column_group][reference_total_revenue]["value"] == (
-    total_revenue["columns"][4]["no_format"]
+    total_revenue["columns"][5]["no_format"]
 )
 
 unfolded_options = report.get_options({
@@ -104,28 +105,28 @@ assert fx_parent["name"] == "Operating Cost"
 assert operating_cost_account_parent["name"] == "Operating Cost"
 expected_budget_percentage = report._compute_column_percent_comparison_data(
     unfolded_options,
-    bone_dxa["columns"][4]["no_format"],
     bone_dxa["columns"][5]["no_format"],
+    bone_dxa["columns"][6]["no_format"],
     green_on_positive=env["tha.vhg.pnl.report.handler"]._green_on_positive_for_budget("outpatient"),
 )
-assert bone_dxa["columns"][6]["name"] == expected_budget_percentage["name"]
-assert bone_dxa["columns"][6]["comparison_mode"] == expected_budget_percentage["mode"]
-assert bone_dxa["columns"][6]["figure_type"] == "string"
-assert bone_dxa["columns"][4]["green_on_positive"] is True
-assert bone_dxa["columns"][6]["comparison_mode"] == env["tha.vhg.pnl.report.handler"]._budget_comparison_mode(
-    bone_dxa["columns"][4]["no_format"], bone_dxa["columns"][5]["no_format"], True,
-    bone_dxa["columns"][6]["comparison_mode"],
+assert bone_dxa["columns"][7]["name"] == expected_budget_percentage["name"]
+assert bone_dxa["columns"][7]["comparison_mode"] == expected_budget_percentage["mode"]
+assert bone_dxa["columns"][7]["figure_type"] == "string"
+assert bone_dxa["columns"][5]["green_on_positive"] is True
+assert bone_dxa["columns"][7]["comparison_mode"] == env["tha.vhg.pnl.report.handler"]._budget_comparison_mode(
+    bone_dxa["columns"][5]["no_format"], bone_dxa["columns"][6]["no_format"], True,
+    bone_dxa["columns"][7]["comparison_mode"],
 )
 
-commission_budget_percentage = commission["columns"][6]
-assert commission["columns"][4]["green_on_positive"] is False
+commission_budget_percentage = commission["columns"][7]
+assert commission["columns"][5]["green_on_positive"] is False
 assert commission_budget_percentage["comparison_mode"] == env["tha.vhg.pnl.report.handler"]._budget_comparison_mode(
-    commission["columns"][4]["no_format"], commission["columns"][5]["no_format"], False,
+    commission["columns"][5]["no_format"], commission["columns"][6]["no_format"], False,
     commission_budget_percentage["comparison_mode"],
 )
 assert bone_dxa["columns"][0]["name"].endswith("%")
-assert bone_dxa["columns"][3]["name"].endswith("%")
-assert bone_dxa["columns"][7]["name"].endswith("%")
+assert bone_dxa["columns"][4]["name"].endswith("%")
+assert bone_dxa["columns"][8]["name"].endswith("%")
 
 million_options = report.get_options({
     "date": options["date"],
@@ -135,8 +136,8 @@ million_options = report.get_options({
 })
 million_lines = report._get_lines(million_options)
 million_outpatient = next(line for line in million_lines if line["name"] == "Outpatient (Revenue)")
-assert million_outpatient["columns"][3]["name"] == outpatient["columns"][3]["name"]
-assert million_outpatient["columns"][6]["name"] == outpatient["columns"][6]["name"]
+assert million_outpatient["columns"][4]["name"] == outpatient["columns"][4]["name"]
+assert million_outpatient["columns"][7]["name"] == outpatient["columns"][7]["name"]
 
 taxes = next(line for line in lines if line["name"] == "Taxes")
 total_expenses = next(line for line in lines if line["name"] == "Total Expenses")
