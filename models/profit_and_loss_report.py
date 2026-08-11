@@ -310,7 +310,9 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 "forced_domain": [],
             }
             columns.append({
-                "name": "Amount",
+                "name": "Actual" if options.get("budgets") and any(
+                    budget.get("selected") for budget in options["budgets"]
+                ) else "Amount",
                 "column_group_key": period_total_column_group_key,
                 "expression_label": "period_total",
                 "sortable": False,

@@ -48,7 +48,7 @@ assert [header["colspan"] for header in options["column_headers"][0]] == [4, 4, 
 assert all(len(line["columns"]) == 12 for line in lines)
 assert options["columns"][0]["name"] == "%"
 assert options["columns"][0]["figure_type"] == "percentage"
-assert options["columns"][1]["name"] == "Amount"
+assert options["columns"][1]["name"] == "Actual"
 assert options["columns"][2]["name"] == "Budget"
 assert options["columns"][3]["name"] == "%"
 assert options["columns"][5]["name"] == "Actual"
@@ -211,8 +211,8 @@ assert handler._budget_comparison_mode(0.0, 100.0, True, "green") == "red"
 assert handler._budget_comparison_mode(0.0, 100.0, False, "red") == "green"
 zero_line = {
     "columns": [
-        {"column_group_key": options["columns"][3]["column_group_key"], "no_format": 0.0},
-        {"column_group_key": options["columns"][4]["column_group_key"], "no_format": 0.0},
+        {"column_group_key": options["columns"][5]["column_group_key"], "no_format": 0.0},
+        {"column_group_key": options["columns"][6]["column_group_key"], "no_format": 0.0},
     ],
 }
 assert handler._is_all_zero_display_line(options, zero_line)
