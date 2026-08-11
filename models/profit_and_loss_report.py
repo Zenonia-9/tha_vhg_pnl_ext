@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime
 
 from odoo import models
-from odoo.tools import SQL
+from odoo.tools import SQL, float_compare, float_is_zero
 
 
 class VhgProfitAndLossReportHandler(models.AbstractModel):
@@ -175,11 +175,32 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if not reference_line_ids:
             return lines
 
-        return [
+        display_lines = [
             line
             for line in lines
             if report._get_model_info_from_id(line["id"])[1] not in reference_line_ids
         ]
+        return [
+            line for line in display_lines
+            if not self._is_all_zero_display_line(options, line)
+        ]
+
+    @staticmethod
+    def _is_all_zero_display_line(options, line):
+        """Hide Notes rows with no actual or budget amount in any displayed period."""
+        columns_by_group = {
+            column["column_group_key"]: column for column in options["columns"]
+        }
+        amount_cells = [
+            cell for cell in line["columns"]
+            if columns_by_group.get(cell["column_group_key"], {}).get("expression_label")
+            in ("balance", "period_total")
+        ]
+        return bool(amount_cells) and all(
+            cell.get("no_format") is None
+            or float_is_zero(cell["no_format"], precision_rounding=0.01)
+            for cell in amount_cells
+        )
 
     def _custom_options_initializer(self, report, options, previous_options):
         companies = self.env["res.company"].browse(report.get_report_company_ids(options))
@@ -285,7 +306,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 "forced_domain": [],
             }
             columns.append({
-                "name": "Balance",
+                "name": "Amount",
                 "column_group_key": period_total_column_group_key,
                 "expression_label": "period_total",
                 "sortable": False,
@@ -367,6 +388,18 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     "blank_if_zero": False,
                 })
 
+        has_selected_budget = bool(budget_percentage_column_groups)
+        if has_selected_budget:
+            budget_actual_column_group_keys = {
+                actual_column_group_key
+                for actual_column_group_key, _budget_column_group_key
+                in budget_percentage_column_groups.values()
+                if actual_column_group_key
+            }
+            for column in options["columns"]:
+                if column["column_group_key"] in budget_actual_column_group_keys:
+                    column["name"] = "Actual"
+
         top_headers = []
         if has_previous_period_comparison:
             top_headers.append({"name": period_total_header, "colspan": 2})
@@ -429,6 +462,27 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 {"name": header["name"], "colspan": header["colspan"], "rowspan": 1}
                 for header in horizontal_headers
             ])
+        elif has_selected_budget:
+            amount_headers = []
+            budget_amount_column_group_keys = set()
+            budget_percentage_column_group_keys = set()
+            for percentage_column_group_key, (
+                actual_column_group_key, budget_column_group_key,
+            ) in budget_percentage_column_groups.items():
+                if actual_column_group_key:
+                    budget_amount_column_group_keys.add(budget_column_group_key)
+                    budget_percentage_column_group_keys.add(percentage_column_group_key)
+            for column in options["columns"]:
+                column_group_key = column["column_group_key"]
+                if column_group_key in budget_actual_column_group_keys:
+                    amount_headers.append({"name": "Amount", "colspan": 3})
+                elif column_group_key in (
+                    budget_amount_column_group_keys | budget_percentage_column_group_keys
+                ):
+                    continue
+                else:
+                    amount_headers.append({"name": "", "colspan": 1})
+            header_rows.append(amount_headers)
 
         options["vhg_notes_header_rows"] = header_rows
         options["column_headers"] = [[
@@ -607,7 +661,13 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     percentage_options,
                     balances.get(actual_column_group_key, 0.0),
                     balances.get(budget_column_group_key, 0.0),
-                    green_on_positive=budget_base_column.get("green_on_positive", False),
+                    green_on_positive=self._green_on_positive_for_budget(group_key),
+                )
+                comparison["mode"] = self._budget_comparison_mode(
+                    balances.get(actual_column_group_key, 0.0),
+                    balances.get(budget_column_group_key, 0.0),
+                    self._green_on_positive_for_budget(group_key),
+                    comparison["mode"],
                 )
                 columns.append(report._build_column_dict(
                     comparison["name"],
@@ -621,10 +681,14 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 continue
             column_dict = report._build_column_dict(
                 value,
-                column,
+                {
+                    **column,
+                    "green_on_positive": self._green_on_positive_for_budget(group_key),
+                },
                 options=percentage_options if is_actual_percent or is_period_total_percent else options,
                 digits=2 if is_period_total or is_period_total_percent or is_actual_percent else 1,
             )
+            column_dict["green_on_positive"] = self._green_on_positive_for_budget(group_key)
             if column["figure_type"] == "monetary":
                 column_dict = self._format_monetary_display(
                     report, options, value, column_dict
@@ -644,6 +708,25 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     })
             columns.append(column_dict)
         return columns
+
+    def _green_on_positive_for_budget(self, group_key):
+        """Return whether exceeding budget is favourable for this P&L row."""
+        expense_groups = {
+            key for key, _name, sign, _codes in self._GROUPS if sign > 0
+        }
+        expense_totals = {"total_expenses"}
+        return group_key not in expense_groups | expense_totals
+
+    @staticmethod
+    def _budget_comparison_mode(actual, budget, green_on_positive, fallback_mode):
+        """Use the P&L rule even when Odoo formats a zero ratio as green."""
+        if fallback_mode == "muted" or float_is_zero(budget, precision_rounding=0.1):
+            return fallback_mode
+        comparison = float_compare(actual, budget, precision_rounding=0.1)
+        if comparison == 0:
+            return "muted"
+        is_favourable = (comparison > 0) == green_on_positive
+        return "green" if is_favourable else "red"
 
     def _period_total_percent(self, group_key, balances, group_balances, options):
         balance_column_group_keys = options.get(
@@ -680,7 +763,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "name": name,
             "level": 1,
             "class": "fw-bold",
-            "columns": self._columns(report, options, balances),
+            "columns": self._columns(report, options, balances, group_key=key),
             "unfoldable": True,
             "unfolded": bool(unfolded),
             "expand_function": "_report_expand_unfoldable_line_vhg_pnl_group",
@@ -714,7 +797,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "name": name,
             "level": 0,
             "class": "fw-bold",
-            "columns": self._columns(report, options, balances),
+            "columns": self._columns(report, options, balances, group_key=key),
             "unfoldable": False,
         }
 

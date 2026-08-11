@@ -48,6 +48,15 @@ assert [header["colspan"] for header in options["column_headers"][0]] == [2, 4, 
 assert all(len(line["columns"]) == 10 for line in lines)
 assert options["columns"][0]["name"] == "%"
 assert options["columns"][0]["figure_type"] == "percentage"
+assert options["columns"][1]["name"] == "Amount"
+assert options["columns"][3]["name"] == "Actual"
+assert options["columns"][4]["name"] == budget.name
+assert options["columns"][5]["name"] == "%"
+assert len(options["vhg_notes_header_rows"]) == 2
+assert [header["name"] for header in options["vhg_notes_header_rows"][1]] == [
+    "", "", "", "Amount", "", "Amount",
+]
+assert sum(header["colspan"] for header in options["vhg_notes_header_rows"][1]) == 10
 
 outpatient = next(line for line in lines if line["name"] == "Outpatient (Revenue)")
 assert outpatient["columns"][1]["no_format"] == (
@@ -96,11 +105,23 @@ expected_budget_percentage = report._compute_column_percent_comparison_data(
     unfolded_options,
     bone_dxa["columns"][3]["no_format"],
     bone_dxa["columns"][4]["no_format"],
-    green_on_positive=bone_dxa["columns"][3]["green_on_positive"],
+    green_on_positive=env["tha.vhg.pnl.report.handler"]._green_on_positive_for_budget("outpatient"),
 )
 assert bone_dxa["columns"][5]["name"] == expected_budget_percentage["name"]
 assert bone_dxa["columns"][5]["comparison_mode"] == expected_budget_percentage["mode"]
 assert bone_dxa["columns"][5]["figure_type"] == "string"
+assert bone_dxa["columns"][3]["green_on_positive"] is True
+assert bone_dxa["columns"][5]["comparison_mode"] == env["tha.vhg.pnl.report.handler"]._budget_comparison_mode(
+    bone_dxa["columns"][3]["no_format"], bone_dxa["columns"][4]["no_format"], True,
+    bone_dxa["columns"][5]["comparison_mode"],
+)
+
+commission_budget_percentage = commission["columns"][5]
+assert commission["columns"][3]["green_on_positive"] is False
+assert commission_budget_percentage["comparison_mode"] == env["tha.vhg.pnl.report.handler"]._budget_comparison_mode(
+    commission["columns"][3]["no_format"], commission["columns"][4]["no_format"], False,
+    commission_budget_percentage["comparison_mode"],
+)
 assert bone_dxa["columns"][0]["name"].endswith("%")
 assert bone_dxa["columns"][2]["name"].endswith("%")
 assert bone_dxa["columns"][6]["name"].endswith("%")
@@ -181,6 +202,18 @@ assert sum(
     for header in options_without_budget["column_headers"][0]
 ) == 6
 assert all(len(line["columns"]) == 6 for line in lines_without_budget)
+assert all(column["name"] != "Balance" for column in options_without_budget["columns"])
+
+handler = env["tha.vhg.pnl.report.handler"]
+assert handler._budget_comparison_mode(0.0, 100.0, True, "green") == "red"
+assert handler._budget_comparison_mode(0.0, 100.0, False, "red") == "green"
+zero_line = {
+    "columns": [
+        {"column_group_key": options["columns"][3]["column_group_key"], "no_format": 0.0},
+        {"column_group_key": options["columns"][4]["column_group_key"], "no_format": 0.0},
+    ],
+}
+assert handler._is_all_zero_display_line(options, zero_line)
 
 print({
     "columns": len(options["columns"]),

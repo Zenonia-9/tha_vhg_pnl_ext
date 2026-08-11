@@ -13,7 +13,7 @@
         <field name="custom_handler_model_id" ref="model_tha_vhg_pnl_report_handler"/>
         <field name="column_ids">
             <record id="report_vhg_profit_and_loss_balance" model="account.report.column">
-                <field name="name">Balance</field>
+                <field name="name">Amount</field>
                 <field name="expression_label">balance</field>
             </record>
         </field>
