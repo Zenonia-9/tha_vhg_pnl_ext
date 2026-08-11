@@ -221,6 +221,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             if column_group.get("forced_options", {}).get("vhg_period_total")
             or column_group.get("forced_options", {}).get("vhg_period_total_percent")
             or column_group.get("forced_options", {}).get("vhg_actual_percent")
+            or column_group.get("forced_options", {}).get("vhg_period_total_budget")
         }
         options["columns"] = [
             column
@@ -253,6 +254,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         options["vhg_period_total_enabled"] = has_previous_period_comparison
         period_total_column_group_key = "vhg_period_total"
         period_total_percent_column_group_key = "vhg_period_total_percent"
+        period_total_budget_column_group_key = "vhg_period_total_budget"
         period_total_header = ""
         if has_previous_period_comparison:
             period_date_keys = {
@@ -313,6 +315,19 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 "figure_type": "monetary",
                 "blank_if_zero": False,
             })
+            if options.get("budgets") and any(budget.get("selected") for budget in options["budgets"]):
+                column_groups[period_total_budget_column_group_key] = {
+                    "forced_options": {"vhg_period_total_budget": True},
+                    "forced_domain": [],
+                }
+                columns.append({
+                    "name": "Budget",
+                    "column_group_key": period_total_budget_column_group_key,
+                    "expression_label": "period_total_budget",
+                    "sortable": False,
+                    "figure_type": "monetary",
+                    "blank_if_zero": False,
+                })
 
         for column in native_columns:
             column_group_key = column["column_group_key"]
@@ -368,6 +383,12 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     budget_column_groups.get((date_key, budget_id)),
                 )
         options["vhg_budget_percentage_column_groups"] = budget_percentage_column_groups
+        options["vhg_period_total_budget_column_group_key"] = period_total_budget_column_group_key
+        options["vhg_period_total_budget_balance_column_group_keys"] = [
+            column["column_group_key"]
+            for column in options["columns"]
+            if options["column_groups"].get(column["column_group_key"], {}).get("forced_options", {}).get("compute_budget")
+        ]
 
         budget_names = {
             budget["id"]: budget["name"]
@@ -376,11 +397,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         }
         for column in options["columns"]:
             column_group_key = column["column_group_key"]
-            if column_group_key == period_total_column_group_key:
+            if column_group_key in (period_total_column_group_key, period_total_budget_column_group_key):
                 continue
             forced_options = options["column_groups"][column_group_key]["forced_options"]
-            if budget_id := forced_options.get("compute_budget"):
-                column["name"] = budget_names.get(budget_id, "Budget")
+            if forced_options.get("compute_budget"):
+                column["name"] = "Budget"
             elif forced_options.get("budget_percentage"):
                 column.update({
                     "name": "%",
@@ -402,9 +423,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
         top_headers = []
         if has_previous_period_comparison:
-            top_headers.append({"name": period_total_header, "colspan": 2})
+            total_colspan = 3 if period_total_budget_column_group_key in options["column_groups"] else 2
+            top_headers.append({"name": period_total_header, "colspan": total_colspan})
         for column in options["columns"]:
-            if column["column_group_key"] == period_total_column_group_key:
+            if column["column_group_key"] in (period_total_column_group_key, period_total_budget_column_group_key):
                 continue
             if column["column_group_key"] == period_total_percent_column_group_key:
                 continue
@@ -432,7 +454,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if selected_horizontal_group_id:
             horizontal_headers = []
             for column in options["columns"]:
-                if column["column_group_key"] == period_total_column_group_key:
+                if column["column_group_key"] in (period_total_column_group_key, period_total_budget_column_group_key):
                     continue
                 if column["column_group_key"] == period_total_percent_column_group_key:
                     continue
@@ -474,7 +496,13 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     budget_percentage_column_group_keys.add(percentage_column_group_key)
             for column in options["columns"]:
                 column_group_key = column["column_group_key"]
-                if column_group_key in budget_actual_column_group_keys:
+                if column_group_key == period_total_percent_column_group_key:
+                    amount_headers.append({"name": "", "colspan": 1})
+                elif column_group_key == period_total_column_group_key:
+                    amount_headers.append({"name": "Amount", "colspan": 1})
+                elif column_group_key == period_total_budget_column_group_key:
+                    amount_headers.append({"name": "Budget", "colspan": 1})
+                elif column_group_key in budget_actual_column_group_keys:
                     amount_headers.append({"name": "Amount", "colspan": 3})
                 elif column_group_key in (
                     budget_amount_column_group_keys | budget_percentage_column_group_keys
@@ -624,6 +652,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         for column in options["columns"]:
             is_period_total = column["expression_label"] == "period_total"
             is_period_total_percent = column["expression_label"] == "period_total_percent"
+            is_period_total_budget = column["expression_label"] == "period_total_budget"
             is_actual_percent = column["expression_label"] == "actual_percent"
             budget_percentage_group_keys = budget_percentage_column_groups.get(column["column_group_key"])
             value = balances.get(column["column_group_key"], 0.0)
@@ -631,6 +660,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 value = sum(
                     balances.get(column_group_key, 0.0)
                     for column_group_key in options.get("vhg_period_total_balance_column_group_keys", ())
+                )
+            elif is_period_total_budget:
+                value = sum(
+                    balances.get(column_group_key, 0.0)
+                    for column_group_key in options.get("vhg_period_total_budget_balance_column_group_keys", ())
                 )
             elif is_period_total_percent:
                 value = (
@@ -686,7 +720,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     "green_on_positive": self._green_on_positive_for_budget(group_key),
                 },
                 options=percentage_options if is_actual_percent or is_period_total_percent else options,
-                digits=2 if is_period_total or is_period_total_percent or is_actual_percent else 1,
+                digits=2 if is_period_total or is_period_total_percent or is_period_total_budget or is_actual_percent else 1,
             )
             column_dict["green_on_positive"] = self._green_on_positive_for_budget(group_key)
             if column["figure_type"] == "monetary":
@@ -711,11 +745,17 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
     def _green_on_positive_for_budget(self, group_key):
         """Return whether exceeding budget is favourable for this P&L row."""
-        expense_groups = {
-            key for key, _name, sign, _codes in self._GROUPS if sign > 0
-        }
+        expense_groups = {key for key, _name, sign, _codes in self._GROUPS if sign > 0}
         expense_totals = {"total_expenses"}
-        return group_key not in expense_groups | expense_totals
+        income_totals = {
+            "total_revenue", "net_revenues", "net_operating_revenue", "ebitda",
+            "ebit", "earnings_before_tax", "earnings_after_tax",
+        }
+        if group_key in expense_groups or group_key in expense_totals:
+            return False
+        if group_key in income_totals or group_key is None:
+            return True
+        return True
 
     @staticmethod
     def _budget_comparison_mode(actual, budget, green_on_positive, fallback_mode):
