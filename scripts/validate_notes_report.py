@@ -178,14 +178,8 @@ native_xlsx_lines = report._get_lines(native_xlsx_options)
 inpatient_header = next(
     line for line in native_xlsx_lines if line["name"] == "Inpatient (Revenue)"
 )
-inpatient_total = next(
-    line for line in native_xlsx_lines if line["name"] == "Total Inpatient (Revenue)"
-)
-assert sum(
-    line["name"] == "Total Inpatient (Revenue)" for line in native_xlsx_lines
-) == 1
 assert all(not column["name"] for column in inpatient_header["columns"])
-assert inpatient_total["columns"][1]["no_format"] is not None
+assert not any("|total~~" in line["id"] for line in native_xlsx_lines)
 
 options_without_budget = report.get_options({
     "date": {
@@ -209,13 +203,6 @@ assert all(column["name"] != "Balance" for column in options_without_budget["col
 handler = env["tha.vhg.pnl.report.handler"]
 assert handler._budget_comparison_mode(0.0, 100.0, True, "green") == "red"
 assert handler._budget_comparison_mode(0.0, 100.0, False, "red") == "green"
-zero_line = {
-    "columns": [
-        {"column_group_key": options["columns"][5]["column_group_key"], "no_format": 0.0},
-        {"column_group_key": options["columns"][6]["column_group_key"], "no_format": 0.0},
-    ],
-}
-assert handler._is_all_zero_display_line(options, zero_line)
 
 print({
     "columns": len(options["columns"]),

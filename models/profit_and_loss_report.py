@@ -175,32 +175,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if not reference_line_ids:
             return lines
 
-        display_lines = [
+        return [
             line
             for line in lines
             if report._get_model_info_from_id(line["id"])[1] not in reference_line_ids
         ]
-        return [
-            line for line in display_lines
-            if not self._is_all_zero_display_line(options, line)
-        ]
-
-    @staticmethod
-    def _is_all_zero_display_line(options, line):
-        """Hide Notes rows with no actual or budget amount in any displayed period."""
-        columns_by_group = {
-            column["column_group_key"]: column for column in options["columns"]
-        }
-        amount_cells = [
-            cell for cell in line["columns"]
-            if columns_by_group.get(cell["column_group_key"], {}).get("expression_label")
-            in ("balance", "period_total")
-        ]
-        return bool(amount_cells) and all(
-            cell.get("no_format") is None
-            or float_is_zero(cell["no_format"], precision_rounding=0.01)
-            for cell in amount_cells
-        )
 
     def _custom_options_initializer(self, report, options, previous_options):
         companies = self.env["res.company"].browse(report.get_report_company_ids(options))
