@@ -687,6 +687,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     self._green_on_positive_for_budget(group_key),
                     comparison["mode"],
                 )
+                comparison["name"] = self._budget_comparison_name(comparison)
                 columns.append(report._build_column_dict(
                     comparison["name"],
                     {
@@ -734,6 +735,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     self._green_on_positive_for_budget(group_key),
                     comparison["mode"],
                 )
+                comparison["name"] = self._budget_comparison_name(comparison)
                 columns.append(report._build_column_dict(
                     comparison["name"],
                     {
@@ -805,6 +807,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             return "muted"
         is_favourable = (comparison > 0) == green_on_positive
         return "green" if is_favourable else "red"
+
+    @staticmethod
+    def _budget_comparison_name(comparison):
+        """Do not display a variance when a line has no comparable budget."""
+        return "" if comparison["mode"] == "muted" and comparison["name"] == "n/a" else comparison["name"]
 
     def _period_total_percent(self, group_key, balances, group_balances, options):
         balance_column_group_keys = options.get(

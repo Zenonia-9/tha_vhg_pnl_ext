@@ -207,6 +207,7 @@ assert all(column["name"] != "Balance" for column in options_without_budget["col
 handler = env["tha.vhg.pnl.report.handler"]
 assert handler._budget_comparison_mode(0.0, 100.0, True, "green") == "red"
 assert handler._budget_comparison_mode(0.0, 100.0, False, "red") == "green"
+assert handler._budget_comparison_name({"name": "n/a", "mode": "muted"}) == ""
 
 print({
     "columns": len(options["columns"]),
