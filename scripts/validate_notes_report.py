@@ -178,8 +178,12 @@ native_xlsx_lines = report._get_lines(native_xlsx_options)
 inpatient_header = next(
     line for line in native_xlsx_lines if line["name"] == "Inpatient (Revenue)"
 )
+native_bone_dxa = next(
+    line for line in native_xlsx_lines if line["name"] == "500010 Bone Dxa Income"
+)
 assert all(not column["name"] for column in inpatient_header["columns"])
-assert not any("|total~~" in line["id"] for line in native_xlsx_lines)
+assert native_bone_dxa["columns"][0]["name"].endswith("%")
+assert native_bone_dxa["columns"][4]["name"].endswith("%")
 
 options_without_budget = report.get_options({
     "date": {

@@ -759,7 +759,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     report, options, value, column_dict
                 )
             elif is_actual_percent or is_period_total_percent:
-                formatted_percentage = report.format_value(
+                formatted_percentage = report.with_context(no_format=False).format_value(
                     percentage_options,
                     value,
                     "percentage",
@@ -767,6 +767,13 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 )
                 column_dict["name"] = formatted_percentage
                 if options.get("export_mode") != "file":
+                    column_dict.update({
+                        "figure_type": "string",
+                        "no_format": formatted_percentage if value is not None else None,
+                    })
+                else:
+                    # Native Notes XLSX writes the display value, not the raw
+                    # percentage figure. Keep the suffix that users see in Odoo.
                     column_dict.update({
                         "figure_type": "string",
                         "no_format": formatted_percentage if value is not None else None,
