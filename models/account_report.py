@@ -6,6 +6,30 @@ from odoo import models
 class AccountReport(models.Model):
     _inherit = "account.report"
 
+    def _report_custom_engine_vhg_pnl_reference(
+        self, expressions, options, date_scope, current_groupby, next_groupby,
+        offset=0, limit=None, warnings=None,
+    ):
+        """Make VHG P&L reference expressions callable from any report.
+
+        Odoo resolves custom-engine methods on the report currently being
+        evaluated, including cross-report expressions.  Delegate those calls
+        to the P&L handler while retaining the caller's date/company columns.
+        """
+        pnl_report = self.env.ref("tha_vhg_pnl_ext.report_vhg_profit_and_loss")
+        pnl_options = {**options, "report_id": pnl_report.id}
+        handler = self.env["tha.vhg.pnl.report.handler"]
+        return handler._report_custom_engine_vhg_pnl_reference(
+            expressions,
+            pnl_options,
+            date_scope,
+            current_groupby,
+            next_groupby,
+            offset=offset,
+            limit=limit,
+            warnings=warnings,
+        )
+
     def _get_lines(self, options, all_column_groups_expression_totals=None, warnings=None):
         lines = super()._get_lines(
             options,

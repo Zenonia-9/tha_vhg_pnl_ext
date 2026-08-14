@@ -24,6 +24,12 @@ lines = report._get_lines(options)
 # source of truth.
 reference_lines = report.line_ids.filtered(lambda line: (line.code or "").startswith("VHG_"))
 assert len(reference_lines) == 28
+balance_sheet_report = env.ref("tha_vhg_bs_ext.report_vhg_balance_sheet_notes", raise_if_not_found=False)
+if balance_sheet_report:
+    cross_report_method = balance_sheet_report._get_custom_report_function(
+        "_report_custom_engine_vhg_pnl_reference", "custom_engine"
+    )
+    assert cross_report_method
 assert sum(line["name"] == "Total Revenue" for line in lines) == 1
 
 line_names = [line["name"] for line in lines]
