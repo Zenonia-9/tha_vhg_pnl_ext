@@ -1,3 +1,23 @@
+.o_action.account_report.o_vhg_pnl_summary,
+.o_action.account_report.o_vhg_pnl_notes {
+    // Custom VHG headers are sticky. Keep their background opaque so report
+    // lines remain behind the header instead of being visible through it.
+    .o_account_reports_table > thead#table_header.sticky {
+        background: var(--AccountFinancial-background-color) !important;
+        isolation: isolate;
+        z-index: 2;
+    }
+
+    .o_account_reports_table > thead#table_header.sticky th {
+        background: var(--AccountFinancial-background-color) !important;
+    }
+
+    .o_account_reports_table > thead#table_header.sticky tr[data-id="report_title_row"] th {
+        position: relative;
+        z-index: 1;
+    }
+}
+
 .o_action.account_report.o_vhg_pnl_summary {
     .o_account_reports_table {
         min-width: max-content;
