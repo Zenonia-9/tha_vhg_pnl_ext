@@ -3,13 +3,13 @@
     // Custom VHG headers are sticky. Keep their background opaque so report
     // lines remain behind the header instead of being visible through it.
     .o_account_reports_table > thead#table_header.sticky {
-        background: var(--AccountFinancial-background-color) !important;
+        background-color: var(--AccountFinancial-background-color, var(--body-bg, #fff)) !important;
         isolation: isolate;
         z-index: 2;
     }
 
     .o_account_reports_table > thead#table_header.sticky th {
-        background: var(--AccountFinancial-background-color) !important;
+        background-color: var(--AccountFinancial-background-color, var(--body-bg, #fff)) !important;
     }
 
     .o_account_reports_table > thead#table_header.sticky tr[data-id="report_title_row"] th {
