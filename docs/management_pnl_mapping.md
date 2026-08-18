@@ -120,6 +120,7 @@ The Notes report shows the same mapped groups and can unfold each group to its i
 | Outpatients and Other (EOPD, Day care) | Shared base: `Outpatients + Other (EOPD, Day care)` |
 | Other Hospital Revenue, Non-Hospital Revenue, Complex Building & BIS | Shared base: the sum of those three groups |
 | Staff Cost and Bonus | Shared base: `Staff Cost + Bonus` |
+| EBITDA | Total Net Revenues |
 | All other groups/accounts | Their own group balance is the base; the group itself therefore displays 100% when non-zero |
 | Period Total | Sum of the current period plus the selected previous comparison periods |
 | Budget % | `Actual / Budget × 100` in the Notes report's native budget comparison |

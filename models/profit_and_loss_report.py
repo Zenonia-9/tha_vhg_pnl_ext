@@ -103,6 +103,11 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         "commission_expense", "taxes",
     )
 
+    _TOTAL_NET_REVENUE_GROUPS = (
+        "inpatient", "outpatient", "eopd_day_care", "other_hospital_revenue",
+        "non_hospital_revenue", "rental_complex",
+    )
+
     _SHARED_PERCENTAGE_GROUPS = {
         "outpatient": ("outpatient", "eopd_day_care"),
         "eopd_day_care": ("outpatient", "eopd_day_care"),
@@ -625,6 +630,26 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 result[column_group_key] -= value
         return result
 
+    def _percentage_denominator_amount(self, group_key, group_balances, column_group_keys):
+        """Return the approved percentage base for the requested Notes row."""
+        if group_key == "ebitda":
+            total_net_revenues = self._combine(
+                group_balances,
+                additions=self._TOTAL_NET_REVENUE_GROUPS,
+                deductions=("direct_cost",),
+            )
+            return sum(
+                total_net_revenues[column_group_key]
+                for column_group_key in column_group_keys
+            )
+
+        denominator_groups = self._SHARED_PERCENTAGE_GROUPS.get(group_key, (group_key,))
+        return sum(
+            group_balances[denominator_group][column_group_key]
+            for denominator_group in denominator_groups
+            for column_group_key in column_group_keys
+        )
+
     @staticmethod
     def _format_monetary_display(report, options, value, column_dict):
         rounding_factor = {
@@ -817,23 +842,18 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         balance_column_group_keys = options.get(
             "vhg_period_total_balance_column_group_keys", ()
         )
-        denominator_groups = self._SHARED_PERCENTAGE_GROUPS.get(group_key, (group_key,))
         numerator = sum(
             balances.get(column_group_key, 0.0)
             for column_group_key in balance_column_group_keys
         )
-        denominator = sum(
-            group_balances[denominator_group][column_group_key]
-            for denominator_group in denominator_groups
-            for column_group_key in balance_column_group_keys
+        denominator = self._percentage_denominator_amount(
+            group_key, group_balances, balance_column_group_keys
         )
         return numerator * 100.0 / denominator if denominator else None
 
     def _actual_percent(self, group_key, balances, group_balances, column_group_key):
-        denominator_groups = self._SHARED_PERCENTAGE_GROUPS.get(group_key, (group_key,))
-        denominator = sum(
-            group_balances[denominator_group][column_group_key]
-            for denominator_group in denominator_groups
+        denominator = self._percentage_denominator_amount(
+            group_key, group_balances, (column_group_key,)
         )
         if not denominator:
             return None

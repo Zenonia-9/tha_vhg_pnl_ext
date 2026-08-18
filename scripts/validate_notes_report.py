@@ -211,6 +211,26 @@ assert all(len(line["columns"]) == 6 for line in lines_without_budget)
 assert all(column["name"] != "Balance" for column in options_without_budget["columns"])
 
 handler = env["tha.vhg.pnl.report.handler"]
+percentage_test_balances = {
+    "inpatient": {"current": 120.0},
+    "outpatient": {"current": 80.0},
+    "eopd_day_care": {"current": 20.0},
+    "other_hospital_revenue": {"current": 30.0},
+    "non_hospital_revenue": {"current": 10.0},
+    "rental_complex": {"current": 40.0},
+    "direct_cost": {"current": 50.0},
+}
+ebitda_balances = {"current": 100.0}
+# EBITDA % uses Total Net Revenues: (120 + 80 + 20 + 30 + 10 + 40 - 50).
+assert handler._actual_percent(
+    "ebitda", ebitda_balances, percentage_test_balances, "current"
+) == 40.0
+assert handler._period_total_percent(
+    "ebitda",
+    ebitda_balances,
+    percentage_test_balances,
+    {"vhg_period_total_balance_column_group_keys": ("current",)},
+) == 40.0
 assert handler._budget_comparison_mode(0.0, 100.0, True, "green") == "red"
 assert handler._budget_comparison_mode(0.0, 100.0, False, "red") == "green"
 assert handler._budget_comparison_name({"name": "n/a", "mode": "muted"}) == ""
