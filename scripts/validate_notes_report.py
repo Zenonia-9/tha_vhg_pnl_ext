@@ -219,9 +219,10 @@ percentage_test_balances = {
     "non_hospital_revenue": {"current": 10.0},
     "rental_complex": {"current": 40.0},
     "direct_cost": {"current": 50.0},
+    "net_operating_revenue": {"current": 250.0},
 }
 ebitda_balances = {"current": 100.0}
-# EBITDA % uses Total Net Revenues: (120 + 80 + 20 + 30 + 10 + 40 - 50).
+# Profitability percentages use Net Operating Revenue as their denominator.
 assert handler._actual_percent(
     "ebitda", ebitda_balances, percentage_test_balances, "current"
 ) == 40.0

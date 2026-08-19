@@ -635,13 +635,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if group_key in {
             "ebitda", "ebit", "earnings_before_tax", "earnings_after_tax",
         }:
-            total_net_revenues = self._combine(
-                group_balances,
-                additions=self._TOTAL_NET_REVENUE_GROUPS,
-                deductions=("direct_cost",),
-            )
             return sum(
-                total_net_revenues[column_group_key]
+                group_balances["net_operating_revenue"][column_group_key]
                 for column_group_key in column_group_keys
             )
 
