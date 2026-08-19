@@ -632,7 +632,9 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
     def _percentage_denominator_amount(self, group_key, group_balances, column_group_keys):
         """Return the approved percentage base for the requested Notes row."""
-        if group_key == "ebitda":
+        if group_key in {
+            "ebitda", "ebit", "earnings_before_tax", "earnings_after_tax",
+        }:
             total_net_revenues = self._combine(
                 group_balances,
                 additions=self._TOTAL_NET_REVENUE_GROUPS,
@@ -743,10 +745,12 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 )
             elif budget_percentage_group_keys:
                 actual_column_group_key, budget_column_group_key = budget_percentage_group_keys
-                if group_key == "ebitda" and group_balances:
-                    # EBITDA's budget percentage is its budget margin, using
-                    # budget Total Net Revenues as the denominator.  This
-                    # mirrors the workbook formula (EBITDA / Net Revenues)
+                if group_key in {
+                    "ebitda", "ebit", "earnings_before_tax", "earnings_after_tax",
+                } and group_balances:
+                    # Profitability budget percentages are margins, using
+                    # budget Total Net Revenues as the denominator. This
+                    # mirrors the workbook formulas (line / Net Revenues)
                     # instead of treating the column as Actual / Budget.
                     budget_value = balances.get(budget_column_group_key, 0.0)
                     budget_base = self._percentage_denominator_amount(
