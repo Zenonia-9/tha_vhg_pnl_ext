@@ -19,6 +19,10 @@ options = report.get_options({
 })
 lines = report._get_lines(options)
 
+ebitda = next(line for line in lines if line["name"] == "EBITDA")
+# Jul 2026 EBITDA margin: 113,949,440 / 139,765,560 = 81.528983...%.
+assert round(ebitda["columns"][4]["no_format"], 10) == round(81.52898324880607, 10)
+
 # The VHG_* lines are a public cross_report contract.  They deliberately stay
 # out of the rendered Notes report, whose dynamic rows remain the display
 # source of truth.

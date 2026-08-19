@@ -819,14 +819,14 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 if options.get("export_mode") != "file":
                     column_dict.update({
                         "figure_type": "string",
-                        "no_format": formatted_percentage if value is not None else None,
+                        # Keep the raw value numeric: Odoo computes period
+                        # comparisons after this handler returns its lines.
+                        "no_format": value,
                     })
                 else:
-                    # Native Notes XLSX writes the display value, not the raw
-                    # percentage figure. Keep the suffix that users see in Odoo.
                     column_dict.update({
                         "figure_type": "string",
-                        "no_format": formatted_percentage if value is not None else None,
+                        "no_format": value,
                     })
             columns.append(column_dict)
         return columns
@@ -919,13 +919,16 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "caret_options": "account.account",
         }
 
-    def _total_line(self, report, options, key, name, balances):
+    def _total_line(self, report, options, key, name, balances, group_balances):
         return {
             "id": report._get_generic_line_id(None, None, markup=f"vhg_pnl_{key}"),
             "name": name,
             "level": 0,
             "class": "fw-bold",
-            "columns": self._columns(report, options, balances, group_key=key),
+            "columns": self._columns(
+                report, options, balances, group_key=key,
+                group_balances=group_balances,
+            ),
             "unfoldable": False,
         }
 
@@ -990,7 +993,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             group_balances,
             additions=("inpatient", "outpatient", "eopd_day_care"),
         )
-        lines.append((0, self._total_line(report, options, "total_revenue", "Total Revenue", total_revenue)))
+        group_balances["total_revenue"] = total_revenue
+        lines.append((0, self._total_line(report, options, "total_revenue", "Total Revenue", total_revenue, group_balances)))
 
         add_group("direct_cost")
         net_revenues = self._combine(
@@ -998,7 +1002,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             additions=("inpatient", "outpatient", "eopd_day_care"),
             deductions=("direct_cost",),
         )
-        lines.append((0, self._total_line(report, options, "net_revenues", "Net Revenues", net_revenues)))
+        group_balances["net_revenues"] = net_revenues
+        lines.append((0, self._total_line(report, options, "net_revenues", "Net Revenues", net_revenues, group_balances)))
 
         for key in ("other_hospital_revenue", "non_hospital_revenue", "rental_complex"):
             add_group(key)
@@ -1011,26 +1016,30 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             ),
             deductions=("direct_cost",),
         )
+        group_balances["net_operating_revenue"] = net_operating_revenue
         lines.append((0, self._total_line(
-            report, options, "net_operating_revenue", "Net Operating Revenue", net_operating_revenue,
+            report, options, "net_operating_revenue", "Net Operating Revenue", net_operating_revenue, group_balances,
         )))
 
         for key in self._OPERATING_EXPENSE_GROUPS:
             add_group(key)
 
         total_expenses = self._combine(group_balances, additions=self._OPERATING_EXPENSE_GROUPS)
-        lines.append((0, self._total_line(report, options, "total_expenses", "Total Expenses", total_expenses)))
+        group_balances["total_expenses"] = total_expenses
+        lines.append((0, self._total_line(report, options, "total_expenses", "Total Expenses", total_expenses, group_balances)))
 
         ebitda = defaultdict(float, net_operating_revenue)
         for column_group_key, value in total_expenses.items():
             ebitda[column_group_key] -= value
-        lines.append((0, self._total_line(report, options, "ebitda", "EBITDA", ebitda)))
+        group_balances["ebitda"] = ebitda
+        lines.append((0, self._total_line(report, options, "ebitda", "EBITDA", ebitda, group_balances)))
 
         add_group("depreciation")
         ebit = defaultdict(float, ebitda)
         for column_group_key, value in group_balances["depreciation"].items():
             ebit[column_group_key] -= value
-        lines.append((0, self._total_line(report, options, "ebit", "EBIT", ebit)))
+        group_balances["ebit"] = ebit
+        lines.append((0, self._total_line(report, options, "ebit", "EBIT", ebit, group_balances)))
 
         add_group("interest_income")
         add_group("finance_expenses")
@@ -1039,16 +1048,18 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             earnings_before_tax[column_group_key] += value
         for column_group_key, value in group_balances["finance_expenses"].items():
             earnings_before_tax[column_group_key] -= value
+        group_balances["earnings_before_tax"] = earnings_before_tax
         lines.append((0, self._total_line(
-            report, options, "earnings_before_tax", "Earnings Before Tax", earnings_before_tax,
+            report, options, "earnings_before_tax", "Earnings Before Tax", earnings_before_tax, group_balances,
         )))
 
         add_group("income_tax")
         earnings_after_tax = defaultdict(float, earnings_before_tax)
         for column_group_key, value in group_balances["income_tax"].items():
             earnings_after_tax[column_group_key] -= value
+        group_balances["earnings_after_tax"] = earnings_after_tax
         lines.append((0, self._total_line(
-            report, options, "earnings_after_tax", "Earnings After Tax", earnings_after_tax,
+            report, options, "earnings_after_tax", "Earnings After Tax", earnings_after_tax, group_balances,
         )))
 
         return lines
