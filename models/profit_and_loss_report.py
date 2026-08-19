@@ -743,6 +743,30 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 )
             elif budget_percentage_group_keys:
                 actual_column_group_key, budget_column_group_key = budget_percentage_group_keys
+                if group_key == "ebitda" and group_balances:
+                    # EBITDA's budget percentage is its budget margin, using
+                    # budget Total Net Revenues as the denominator.  This
+                    # mirrors the workbook formula (EBITDA / Net Revenues)
+                    # instead of treating the column as Actual / Budget.
+                    budget_value = balances.get(budget_column_group_key, 0.0)
+                    budget_base = self._percentage_denominator_amount(
+                        group_key,
+                        group_balances,
+                        (budget_column_group_key,),
+                    )
+                    value = budget_value / budget_base if budget_base else None
+                    column_dict = report._build_column_dict(
+                        value,
+                        {
+                            **column,
+                            "green_on_positive": self._green_on_positive_for_budget(group_key),
+                        },
+                        options=percentage_options,
+                        digits=2,
+                    )
+                    column_dict["green_on_positive"] = self._green_on_positive_for_budget(group_key)
+                    columns.append(column_dict)
+                    continue
                 budget_base_column = next(
                     other_column
                     for other_column in options["columns"]
