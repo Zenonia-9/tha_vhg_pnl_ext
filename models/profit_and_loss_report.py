@@ -195,11 +195,18 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "vhg_notes_report_title": "MONTHLY PERFORMANCE FINANCIAL REPORTS (P&L Note)",
         })
         horizontal_header_names = {}
+        analytic_header_names = {}
         for header_level in options.get("column_headers", []):
             for header in header_level:
                 horizontal_element = header.get("horizontal_groupby_element")
                 if horizontal_element:
                     horizontal_header_names[tuple(sorted(horizontal_element.items()))] = header["name"]
+                analytic_accounts = tuple(
+                    header.get("forced_options", {}).get("analytic_accounts_list", ())
+                )
+                if analytic_accounts:
+                    analytic_header_names[analytic_accounts] = header["name"]
+        has_analytic_columns = bool(analytic_header_names)
 
         synthetic_column_group_keys = {
             column_group_key
@@ -446,15 +453,16 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 })
 
         selected_horizontal_group_id = options.get("selected_horizontal_group_id")
+        has_column_breakdown = bool(selected_horizontal_group_id or has_analytic_columns)
         header_rows = [[
             {
                 "name": header["name"],
                 "colspan": header["colspan"],
-                "rowspan": 2 if selected_horizontal_group_id and not header.get("date_key") else 1,
+                "rowspan": 2 if has_column_breakdown and not header.get("date_key") else 1,
             }
             for header in top_headers
         ]]
-        if selected_horizontal_group_id:
+        if has_column_breakdown:
             horizontal_headers = []
             for column in options["columns"]:
                 if column["column_group_key"] in (period_total_column_group_key, period_total_budget_column_group_key, period_total_budget_percent_column_group_key):
@@ -467,7 +475,12 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 column_group = options["column_groups"][source_column_group_key]
                 forced_options = column_group["forced_options"]
                 horizontal_key = tuple(column_group.get("horizontal_groupby_element", ()))
-                if horizontal_key:
+                analytic_accounts = tuple(forced_options.get("analytic_accounts_list", ()))
+                if analytic_accounts:
+                    label = analytic_header_names.get(analytic_accounts, "Analytic")
+                elif has_analytic_columns:
+                    label = "Total"
+                elif horizontal_key:
                     label = horizontal_header_names.get(horizontal_key, "Actual")
                 elif forced_options.get("compute_budget") or forced_options.get("budget_percentage"):
                     label = "Budget"

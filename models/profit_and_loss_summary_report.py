@@ -26,8 +26,13 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     )
 
     def _custom_options_initializer(self, report, options, previous_options):
-        horizontal_mode = bool(options.get("selected_horizontal_group_id"))
-        horizontal_entities = self._horizontal_entities(options) if horizontal_mode else []
+        analytic_entities = self._analytic_entities(options)
+        analytic_mode = bool(analytic_entities)
+        horizontal_mode = bool(options.get("selected_horizontal_group_id") or analytic_mode)
+        horizontal_entities = (
+            analytic_entities if analytic_mode
+            else self._horizontal_entities(options) if horizontal_mode else []
+        )
         selected_start = fields.Date.to_date(options["date"]["date_from"])
         selected_date = fields.Date.to_date(options["date"]["date_to"])
         month_start = selected_date.replace(day=1)
@@ -66,6 +71,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "vhg_summary_budget_id": selected_budget_ids[0] if selected_budget_ids else None,
             "vhg_summary_query_groups": {},
             "vhg_summary_horizontal_mode": horizontal_mode,
+            "vhg_summary_analytic_mode": analytic_mode,
             "vhg_summary_horizontal_entities": horizontal_entities,
             "vhg_summary_fiscal_label": f"FY {fiscal_start:%b %Y} - {fiscal_end:%b %Y}",
             "vhg_summary_company_names": ", ".join(companies.mapped("name")) or self.env.company.name,
@@ -94,7 +100,14 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             period_label = self._period_label(selected_start, selected_date)
             for entity in horizontal_entities:
                 options["vhg_summary_query_groups"][entity["query_key"]] = self._query_group(
-                    selected_start, selected_date, forced_domain=entity["forced_domain"]
+                    selected_start,
+                    selected_date,
+                    forced_domain=entity["forced_domain"],
+                    extra_forced_options=entity.get("forced_options"),
+                )
+            if analytic_mode:
+                options["vhg_summary_query_groups"]["analytic_total"] = self._query_group(
+                    selected_start, selected_date,
                 )
             visible_months = []
             if show_months:
@@ -123,7 +136,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 {"name": entity["name"], "colspan": 2}
                 for entity in horizontal_entities
             ] + [
-                {"name": f"Conso ({period_label})", "colspan": 2},
+                {
+                    "name": "Total" if analytic_mode else f"Conso ({period_label})",
+                    "colspan": 2,
+                },
             ]
             if visible_months:
                 options["vhg_summary_horizontal_headers"].append({
@@ -267,7 +283,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         return f"{date_from:%b-%y} to {date_to:%b-%y}"
 
     @staticmethod
-    def _query_group(date_from, date_to, budget_id=None, forced_domain=None):
+    def _query_group(
+        date_from, date_to, budget_id=None, forced_domain=None,
+        extra_forced_options=None,
+    ):
         forced_options = {
             "date": {
                 "date_from": fields.Date.to_string(date_from),
@@ -280,7 +299,41 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         }
         if budget_id:
             forced_options["compute_budget"] = budget_id
+        forced_options.update(extra_forced_options or {})
         return {"forced_options": forced_options, "forced_domain": forced_domain or []}
+
+    def _analytic_entities(self, options):
+        """Reuse Odoo's analytic-column setup in this custom dynamic report."""
+        header_names = {}
+        for header_level in options.get("column_headers", []):
+            for header in header_level:
+                account_ids = tuple(
+                    header.get("forced_options", {}).get("analytic_accounts_list", ())
+                )
+                if account_ids:
+                    header_names[account_ids] = header["name"]
+
+        entities = []
+        seen = set()
+        for column in options.get("columns", []):
+            column_group = options.get("column_groups", {}).get(
+                column["column_group_key"], {}
+            )
+            forced_options = column_group.get("forced_options", {})
+            account_ids = tuple(forced_options.get("analytic_accounts_list", ()))
+            if not account_ids or account_ids in seen:
+                continue
+            seen.add(account_ids)
+            entities.append({
+                "name": header_names.get(account_ids, "Analytic"),
+                "query_key": f"analytic_{len(entities)}",
+                "forced_domain": list(column_group.get("forced_domain", [])),
+                "forced_options": {
+                    "analytic_groupby_option": True,
+                    "analytic_accounts_list": account_ids,
+                },
+            })
+        return entities
 
     @staticmethod
     def _column(name, label, figure_type="monetary"):
@@ -567,17 +620,23 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             consolidated_actual += actual
             entity_keys.append(query_key)
 
+        if options.get("vhg_summary_analytic_mode"):
+            consolidated_actual = values[row_key]["analytic_total"]
+            total_keys = ["analytic_total"]
+        else:
+            total_keys = entity_keys
+
         has_budget = bool(options.get("vhg_summary_budget_id"))
         budget = values[row_key]["budget_ytd"] if has_budget else None
         variance = consolidated_actual - budget if has_budget else None
         data.update({
             "consolidated_actual": consolidated_actual,
-            "consolidated_percent": self._summary_percent(row_key, values, entity_keys),
+            "consolidated_percent": self._summary_percent(row_key, values, total_keys),
             "ytd_budget": budget,
             "ytd_budget_percent": self._summary_percent(row_key, values, ["budget_ytd"]) if has_budget else None,
             "ytd_variance": variance,
             "ytd_variance_percent": self._summary_variance_percent(
-                row_key, values, entity_keys, ["budget_ytd"]
+                row_key, values, total_keys, ["budget_ytd"]
             ) if has_budget else None,
         })
         for month_key in options["vhg_summary_month_keys"]:
