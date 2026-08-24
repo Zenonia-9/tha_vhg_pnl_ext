@@ -3,7 +3,7 @@
 from collections import defaultdict
 from datetime import datetime
 
-from odoo import models
+from odoo import fields, models
 from odoo.tools import SQL, float_compare, float_is_zero
 
 
@@ -158,7 +158,9 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             raise ValueError("VHG P&L reference lines do not support groupby expansion.")
 
         report = self.env["account.report"].browse(options["report_id"])
-        group_balances, _account_balances = self._query_group_balances(report, options)
+        group_balances, _account_balances = self._query_group_balances(
+            report, options, date_scope=date_scope,
+        )
         column_group_key = options["owner_column_group"]
         return {
             expression.subformula: group_balances[
@@ -549,7 +551,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             return f"{start_date:%b} - {end_date:%b} Total"
         return f"{start_date:%b %Y} - {end_date:%b %Y}"
 
-    def _query_group_balances(self, report, options):
+    def _query_group_balances(self, report, options, date_scope=None):
         code_to_group = {
             code: (key, sign)
             for key, _name, sign, codes in self._GROUPS
@@ -579,6 +581,17 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 or column_group_key in options.get("vhg_actual_percent_column_groups", {})
             ):
                 continue
+            if date_scope == "from_fiscalyear":
+                column_options = {
+                    **column_options,
+                    "date": {
+                        **column_options["date"],
+                        "date_from": self.env.company.compute_fiscalyear_dates(
+                            fields.Date.from_string(column_options["date"]["date_to"])
+                        )["date_from"].strftime("%Y-%m-%d"),
+                        "mode": "range",
+                    },
+                }
             query = report._get_report_query(column_options, "strict_range", domain=pnl_domain)
             self.env.cr.execute(SQL(
                 """
