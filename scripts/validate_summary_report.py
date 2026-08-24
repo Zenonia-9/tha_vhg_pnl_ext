@@ -162,6 +162,30 @@ assert all(
     for column, cell in zip(no_budget_expanded_options["columns"], line["columns"])
     if column["expression_label"].startswith("budget_month_")
 )
+
+analytic_accounts = env["account.analytic.account"].search([
+    ("name", "in", ("Pro X", "Pro Y", "Pro Z")),
+], order="id")
+if len(analytic_accounts) == 3:
+    analytic_options = report.get_options({
+        **base_previous,
+        "analytic_accounts_groupby": analytic_accounts.ids,
+    })
+    analytic_lines = report._get_lines(analytic_options)
+    analytic_labels = [column["expression_label"] for column in analytic_options["columns"]]
+    assert analytic_options["vhg_summary_horizontal_mode"] is False
+    assert analytic_options["vhg_summary_analytic_headers"] == analytic_accounts.mapped("name")
+    assert analytic_labels[7:13] == [
+        "ytd_actual", "ytd_actual_percent", "analytic_0", "analytic_1", "analytic_2",
+        "analytic_total",
+    ]
+    total_revenue = next(line for line in analytic_lines if line["name"] == "Total Revenue")
+    analytic_values = {
+        column["expression_label"]: total_revenue["columns"][index]["no_format"]
+        for index, column in enumerate(analytic_options["columns"])
+    }
+    assert analytic_values["analytic_total"] == analytic_values["mtd_actual"]
+
 show_zero_options = report.get_options({
     **budget_previous,
     "vhg_show_monthly_columns": True,

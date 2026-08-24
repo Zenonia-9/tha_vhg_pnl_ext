@@ -28,11 +28,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
     def _custom_options_initializer(self, report, options, previous_options):
         analytic_entities = self._analytic_entities(options)
         analytic_mode = bool(analytic_entities)
-        horizontal_mode = bool(options.get("selected_horizontal_group_id") or analytic_mode)
-        horizontal_entities = (
-            analytic_entities if analytic_mode
-            else self._horizontal_entities(options) if horizontal_mode else []
-        )
+        # Analytic selections must keep the Management Summary layout.  The
+        # separate horizontal layout is only for Odoo's Horizontal Group filter.
+        horizontal_mode = bool(options.get("selected_horizontal_group_id"))
+        horizontal_entities = self._horizontal_entities(options) if horizontal_mode else []
         selected_start = fields.Date.to_date(options["date"]["date_from"])
         selected_date = fields.Date.to_date(options["date"]["date_to"])
         month_start = selected_date.replace(day=1)
@@ -72,6 +71,8 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "vhg_summary_query_groups": {},
             "vhg_summary_horizontal_mode": horizontal_mode,
             "vhg_summary_analytic_mode": analytic_mode,
+            "vhg_summary_analytic_entities": analytic_entities,
+            "vhg_summary_analytic_headers": [entity["name"] for entity in analytic_entities],
             "vhg_summary_horizontal_entities": horizontal_entities,
             "vhg_summary_fiscal_label": f"FY {fiscal_start:%b %Y} - {fiscal_end:%b %Y}",
             "vhg_summary_company_names": ", ".join(companies.mapped("name")) or self.env.company.name,
@@ -173,6 +174,13 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 options["vhg_summary_query_groups"]["budget_ytd"] = self._query_group(
                     fiscal_start, month_end, budget_id
                 )
+            for entity in analytic_entities:
+                options["vhg_summary_query_groups"][entity["query_key"]] = self._query_group(
+                    month_start,
+                    month_end,
+                    forced_domain=entity["forced_domain"],
+                    extra_forced_options=entity["forced_options"],
+                )
 
             if show_months or hide_zero_months:
                 group_balances = self._query_summary_balances(report, options)
@@ -211,7 +219,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
 
             options["column_groups"] = {"summary": {"forced_options": {}, "forced_domain": []}}
             options["columns"] = self._display_columns(
-                visible_months, month_start, budget_months=budget_months
+                visible_months,
+                month_start,
+                budget_months=budget_months,
+                analytic_entities=analytic_entities,
             )
             options["column_headers"] = [[{"name": column["name"]} for column in options["columns"]]]
 
@@ -345,7 +356,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "sortable": False,
         }
 
-    def _display_columns(self, months, selected_month, budget_months=None):
+    def _display_columns(self, months, selected_month, budget_months=None, analytic_entities=None):
         columns = [
             self._column("Actual", "mtd_actual"),
             self._column("%", "mtd_actual_percent", "percentage"),
@@ -357,6 +368,10 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             self._column("Actual", "ytd_actual"),
             self._column("%", "ytd_actual_percent", "percentage"),
         ]
+        for index, entity in enumerate(analytic_entities or []):
+            columns.append(self._column(entity["name"], f"analytic_{index}"))
+        if analytic_entities:
+            columns.append(self._column("Total", "analytic_total"))
         columns.extend(
             self._column(start.strftime("%b %Y"), f"month_{start:%Y_%m}")
             for start, _end in months
@@ -579,6 +594,11 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
                 row_key, values, ytd_keys, ["budget_ytd"]
             ) if has_budget else None,
         }
+        for index, entity in enumerate(options.get("vhg_summary_analytic_entities", [])):
+            data[f"analytic_{index}"] = values[row_key][entity["query_key"]]
+        if options.get("vhg_summary_analytic_mode"):
+            # This breakdown follows the normal MTD Actual amount.
+            data["analytic_total"] = mtd_actual
         for month_key in options["vhg_summary_month_keys"]:
             data[f"month_{month_key.removeprefix('actual_')}"] = values[row_key][month_key]
         for budget_month_key in options["vhg_summary_budget_month_keys"]:

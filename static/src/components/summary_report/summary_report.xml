@@ -98,6 +98,7 @@
             <t t-else="">
                 <t t-set="actualMonthCount" t-value="controller.options.vhg_summary_month_keys.length"/>
                 <t t-set="budgetMonthCount" t-value="controller.options.vhg_summary_budget_month_keys.length"/>
+                <t t-set="analyticCount" t-value="controller.options.vhg_summary_analytic_headers.length + (controller.options.vhg_summary_analytic_mode ? 1 : 0)"/>
                 <tr data-id="column_headers_row">
                     <th class="column_header" colspan="6">
                         <t t-out="controller.options.vhg_summary_mtd_label"/>
@@ -106,6 +107,9 @@
                     <th class="column_header o_vhg_particular" rowspan="2">Particular</th>
                     <th class="column_header" colspan="2">
                         <t t-out="controller.options.vhg_summary_ytd_actual_label"/>
+                    </th>
+                    <th t-if="analyticCount" class="column_header" t-att-colspan="analyticCount">
+                        Analytic Actual - <t t-out="controller.options.vhg_summary_mtd_label"/>
                     </th>
                     <th t-if="actualMonthCount" class="column_header" t-att-colspan="actualMonthCount">Monthly Actual</th>
                     <th t-if="budgetMonthCount" class="column_header" t-att-colspan="budgetMonthCount">Monthly Budget</th>
