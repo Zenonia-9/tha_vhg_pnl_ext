@@ -288,7 +288,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             options["vhg_period_total_balance_column_group_keys"] = balance_column_group_keys
             options["vhg_period_total_column_group_key"] = period_total_column_group_key
             options["vhg_period_total_analytic_balance_column_group_keys"] = {
-                analytic_accounts: [
+                ",".join(str(account_id) for account_id in analytic_accounts): [
                     column_group_key for column_group_key in balance_column_group_keys
                     if tuple(options["column_groups"][column_group_key]["forced_options"].get("analytic_accounts_list", ())) == analytic_accounts
                 ]
@@ -760,9 +760,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                         "vhg_period_total_analytic_accounts", ()
                     )
                 )
-                source_keys = options.get("vhg_period_total_analytic_balance_column_group_keys", {}).get(analytic_accounts, ())
+                analytic_key = ",".join(str(account_id) for account_id in analytic_accounts)
+                source_keys = options.get("vhg_period_total_analytic_balance_column_group_keys", {}).get(analytic_key, ())
                 value = sum(balances.get(source_key, 0.0) for source_key in source_keys)
-                if is_period_total_analytic_percent:
+                if is_period_total_analytic_percent and group_balances:
                     denominator = self._percentage_denominator_amount(group_key, group_balances, source_keys)
                     value = value * 100.0 / denominator if denominator else None
             elif is_period_total:
