@@ -464,6 +464,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         ]]
         if has_column_breakdown:
             horizontal_headers = []
+            analytic_headers = []
             for column in options["columns"]:
                 if column["column_group_key"] in (period_total_column_group_key, period_total_budget_column_group_key, period_total_budget_percent_column_group_key):
                     continue
@@ -476,30 +477,38 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                 forced_options = column_group["forced_options"]
                 horizontal_key = tuple(column_group.get("horizontal_groupby_element", ()))
                 analytic_accounts = tuple(forced_options.get("analytic_accounts_list", ()))
-                if analytic_accounts:
-                    label = analytic_header_names.get(analytic_accounts, "Analytic")
-                elif has_analytic_columns:
-                    label = "Total"
-                elif horizontal_key:
-                    label = horizontal_header_names.get(horizontal_key, "Actual")
-                elif forced_options.get("compute_budget") or forced_options.get("budget_percentage"):
-                    label = "Budget"
-                else:
-                    label = "Actual"
                 date_options = forced_options.get("date", {})
-                group_key = (date_options.get("date_from"), date_options.get("date_to"), label)
-                if horizontal_headers and horizontal_headers[-1]["group_key"] == group_key:
-                    horizontal_headers[-1]["colspan"] += 1
-                else:
-                    horizontal_headers.append({
-                        "group_key": group_key,
-                        "name": label,
-                        "colspan": 1,
-                    })
+                date_key = (date_options.get("date_from"), date_options.get("date_to"))
+                if selected_horizontal_group_id:
+                    label = horizontal_header_names.get(horizontal_key, "Actual")
+                    group_key = (*date_key, horizontal_key, label)
+                    if horizontal_headers and horizontal_headers[-1]["group_key"] == group_key:
+                        horizontal_headers[-1]["colspan"] += 1
+                    else:
+                        horizontal_headers.append({"group_key": group_key, "name": label, "colspan": 1})
+                if has_analytic_columns:
+                    label = analytic_header_names.get(analytic_accounts, "Total") if analytic_accounts else "Total"
+                    group_key = (*date_key, horizontal_key, label)
+                    if analytic_headers and analytic_headers[-1]["group_key"] == group_key:
+                        analytic_headers[-1]["colspan"] += 1
+                    else:
+                        analytic_headers.append({"group_key": group_key, "name": label, "colspan": 1})
+                elif not selected_horizontal_group_id:
+                    label = "Budget" if forced_options.get("compute_budget") or forced_options.get("budget_percentage") else "Actual"
+                    group_key = (*date_key, label)
+                    if horizontal_headers and horizontal_headers[-1]["group_key"] == group_key:
+                        horizontal_headers[-1]["colspan"] += 1
+                    else:
+                        horizontal_headers.append({"group_key": group_key, "name": label, "colspan": 1})
             header_rows.append([
                 {"name": header["name"], "colspan": header["colspan"], "rowspan": 1}
                 for header in horizontal_headers
             ])
+            if has_analytic_columns:
+                header_rows.append([
+                    {"name": header["name"], "colspan": header["colspan"], "rowspan": 1}
+                    for header in analytic_headers
+                ])
         elif has_selected_budget:
             amount_headers = []
             budget_amount_column_group_keys = set()
