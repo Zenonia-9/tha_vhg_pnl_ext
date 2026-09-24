@@ -535,16 +535,6 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         )
 
     def _summary_variance_percent(self, row_key, values, actual_keys, budget_keys):
-        if row_key == "net_revenues":
-            return self._subtract_percentages(
-                self._summary_variance_percent("total_revenue", values, actual_keys, budget_keys),
-                self._summary_variance_percent("direct_cost", values, actual_keys, budget_keys),
-            )
-        if row_key == "total_net_revenues":
-            return self._add_percentages(
-                self._summary_variance_percent("net_revenues", values, actual_keys, budget_keys),
-                self._summary_variance_percent("other_revenue", values, actual_keys, budget_keys),
-            )
         actual = self._period_amount(values, row_key, actual_keys)
         budget = self._period_amount(values, row_key, budget_keys)
         return self._ratio(actual - budget, budget)

@@ -113,6 +113,17 @@ for prefix in ("mtd_actual", "mtd_budget", "mtd_variance", "ytd_actual", "ytd_bu
     assert abs(net_revenues_percent - expected_net_revenues_percent) < 0.02
     assert abs(total_net_revenues_percent - expected_total_net_revenues_percent) < 0.02
 
+for metric in ("mtd", "ytd"):
+    net_revenues = lines_by_name["Net Revenues"]
+    variance_index = columns_by_label[f"{metric}_variance"]
+    budget_index = columns_by_label[f"{metric}_budget"]
+    variance_percent_index = columns_by_label[f"{metric}_variance_percent"]
+    variance = displayed_number(net_revenues["columns"][variance_index])
+    budget = displayed_number(net_revenues["columns"][budget_index])
+    expected_variance_percent = (variance / budget) * 100 if budget else None
+    actual_variance_percent = displayed_number(net_revenues["columns"][variance_percent_index])
+    assert expected_variance_percent is None or abs(actual_variance_percent - expected_variance_percent) < 0.02
+
 expanded_options = report.get_options({
     **budget_previous,
     "vhg_show_monthly_columns": True,
