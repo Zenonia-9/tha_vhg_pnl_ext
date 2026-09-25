@@ -46,6 +46,13 @@ assert no_budget_options["vhg_hide_zero_monthly_columns"] is True
 assert [column["name"] for column in no_budget_options["columns"][:9]] == [
     "Actual", "%", "Budget", "%", "Variance", "%", "No.", "Actual", "%",
 ]
+assert "Change %" not in [column["name"] for column in no_budget_options["columns"]]
+highlight_names = {
+    line["name"]
+    for line in no_budget_lines
+    if "o_vhg_summary_highlight" in (line.get("class") or "")
+}
+assert highlight_names == {"EBITDA", "Earnings After Tax"}, highlight_names
 assert len(no_budget_lines) == 27, len(no_budget_lines)
 assert all(not line.get("unfoldable") for line in no_budget_lines)
 assert all(not line.get("expand_function") for line in no_budget_lines)
@@ -95,6 +102,23 @@ columns_by_label = {
     for index, column in enumerate(budget_options["columns"])
 }
 lines_by_name = {line["name"]: line for line in budget_lines}
+for prefix in ("mtd_actual", "mtd_budget", "ytd_actual", "ytd_budget"):
+    direct_cost_percent = displayed_number(
+        lines_by_name["Direct Cost"]["columns"][columns_by_label[f"{prefix}_percent"]]
+    )
+    total_revenue_percent = displayed_number(
+        lines_by_name["Total Revenue"]["columns"][columns_by_label[f"{prefix}_percent"]]
+    )
+    total_revenue = displayed_number(
+        lines_by_name["Total Revenue"]["columns"][columns_by_label[prefix]]
+    )
+    direct_cost = displayed_number(
+        lines_by_name["Direct Cost"]["columns"][columns_by_label[prefix]]
+    )
+    expected_direct_cost_percent = (direct_cost / total_revenue) * 100 if total_revenue else None
+    assert total_revenue_percent is None or abs(total_revenue_percent - 100.0) < 0.02
+    assert expected_direct_cost_percent is None or abs(direct_cost_percent - expected_direct_cost_percent) < 0.02
+
 for prefix in ("mtd_actual", "mtd_budget", "mtd_variance", "ytd_actual", "ytd_budget", "ytd_variance"):
     net_revenues_percent = displayed_number(
         lines_by_name["Net Revenues"]["columns"][columns_by_label[f"{prefix}_percent"]]

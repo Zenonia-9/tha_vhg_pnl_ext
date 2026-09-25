@@ -117,6 +117,20 @@ class AccountReport(models.Model):
         green_percentage = workbook.add_format({
             "border": 1, "bold": True, "bg_color": "#A9D18E", "align": "right", "num_format": "0.00%",
         })
+        highlight_text = workbook.add_format({
+            "border": 1, "border_color": "#F4B183", "bold": True,
+            "font_color": "#C65911", "bg_color": "#FBE4D5",
+        })
+        highlight_number = workbook.add_format({
+            "border": 1, "border_color": "#F4B183", "bold": True,
+            "font_color": "#C65911", "bg_color": "#FBE4D5",
+            "align": "right", "num_format": "#,##0.00",
+        })
+        highlight_percentage = workbook.add_format({
+            "border": 1, "border_color": "#F4B183", "bold": True,
+            "font_color": "#C65911", "bg_color": "#FBE4D5",
+            "align": "right", "num_format": "0.00%",
+        })
 
         columns = print_options["columns"]
         monetary_factor = self._vhg_xlsx_rounding_factor(print_options)
@@ -170,6 +184,7 @@ class AccountReport(models.Model):
                     text, total_text, number, total_number, percentage, total_percentage,
                     monetary_factor,
                     line["name"],
+                    highlight_text, highlight_number, highlight_percentage,
                 )
             return
 
@@ -212,6 +227,7 @@ class AccountReport(models.Model):
                 text, total_text, number, total_number, percentage, total_percentage,
                 monetary_factor,
                 line["name"],
+                highlight_text, highlight_number, highlight_percentage,
             )
 
     def _write_vhg_xlsx_title(self, options, workbook, sheet, last_column, report_name):
@@ -266,12 +282,14 @@ class AccountReport(models.Model):
         sheet, y, values, is_total,
         text, total_text, number, total_number, percentage, total_percentage,
         monetary_factor, line_name,
+        highlight_text=None, highlight_number=None, highlight_percentage=None,
     ):
-        row_formats = (
-            (total_text, total_number, total_percentage)
-            if is_total or line_name.startswith("Total ")
-            else (text, number, percentage)
-        )
+        if line_name in ("EBITDA", "Earnings After Tax") and highlight_text:
+            row_formats = (highlight_text, highlight_number, highlight_percentage)
+        elif is_total or line_name.startswith("Total "):
+            row_formats = (total_text, total_number, total_percentage)
+        else:
+            row_formats = (text, number, percentage)
         text_format, number_format, percentage_format = row_formats
         for x, cell in enumerate(values):
             value = cell.get("no_format")

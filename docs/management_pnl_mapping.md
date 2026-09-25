@@ -87,13 +87,24 @@ The P&L Notes unfolding is the full live name list. Important recently clarified
 
 `% = line amount / base amount × 100`.
 
+The 24 Sep 2026 workbook records the approved mix formulas in the working **Change %** columns. Those formulas replace the previous `%` column. The extra delta columns in that workbook (`new % − old %`) are working notes only and are **not** report columns.
+
 | Lines | Percentage base |
 |---|---|
-| Inpatients, Outpatients, Other (EOPD, Day care), Total Revenue | Total Revenue |
-| Direct Cost, Other Hospital Revenue, Non-Hospital Revenue, Complex Building & BIS, Net Revenues, Other Revenue | Net Revenues |
-| All remaining lines and totals | Total Net Revenues |
+| Inpatients, Outpatients, Other (EOPD, Day care), Total Revenue, Direct Cost, Net Revenues | Total Revenue |
+| Other Hospital Revenue, Non-Hospital Revenue, Complex Building & BIS, Other Revenue | Total Net Revenues |
+| All remaining lines and totals (expenses, EBITDA, EBIT, tax, earnings) | Total Net Revenues |
+
+Composite `%` lines stay formula-driven so they match the workbook:
+
+| Line | `%` formula |
+|---|---|
+| Net Revenues | `Total Revenue % − Direct Cost %` (same as Net Revenues / Total Revenue) |
+| Total Net Revenues | `Net Revenues % + Other Revenue %` |
 
 For the Summary variance column, `Variance % = (Actual - Budget) / Budget × 100`. A percentage is blank when its denominator is zero.
+
+EBITDA and Earnings After Tax use the peach highlight (`#FBE4D5`) on screen, PDF, and Excel export. Other total lines keep the existing green total style.
 
 ## 4. Management Profit and Loss Notes
 

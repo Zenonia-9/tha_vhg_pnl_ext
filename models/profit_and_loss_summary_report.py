@@ -504,12 +504,13 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
         return result
 
     def _percentage_denominator(self, row_key):
-        if row_key in self._REVENUE_GROUPS or row_key == "total_revenue":
-            return "total_revenue"
-        if row_key == "direct_cost" or row_key in self._OTHER_REVENUE_GROUPS or row_key in (
-            "net_revenues", "other_revenue",
+        # Workbook Change % formulas (24 Sep 2026):
+        # revenue block through Net Revenues → Total Revenue
+        # Other Hospital Revenue through Earnings After Tax → Total Net Revenues
+        if row_key in self._REVENUE_GROUPS or row_key in (
+            "total_revenue", "direct_cost", "net_revenues",
         ):
-            return "net_revenues"
+            return "total_revenue"
         return "total_net_revenues"
 
     @staticmethod
@@ -713,6 +714,7 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             "total_revenue", "net_revenues", "other_revenue", "total_net_revenues",
             "total_expenses", "ebitda", "ebit", "earnings_before_tax", "earnings_after_tax",
         }
+        highlight_keys = {"ebitda", "earnings_after_tax"}
         group_keys = {
             *self._REVENUE_GROUPS,
             "direct_cost",
@@ -731,11 +733,14 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             elif key in group_keys:
                 group_number += 1
                 sequence = str(group_number)
+            css_class = "fw-bold" if key in total_keys else ""
+            if key in highlight_keys:
+                css_class = f"{css_class} o_vhg_summary_highlight".strip()
             lines.append((0, {
                 "id": report._get_generic_line_id(None, None, markup=f"vhg_pnl_summary_{key}"),
                 "name": name,
                 "level": 0 if key in total_keys else 1,
-                "class": "fw-bold" if key in total_keys else "",
+                "class": css_class,
                 "columns": self._line_columns(
                     report, options, key, values, sequence
                 ),

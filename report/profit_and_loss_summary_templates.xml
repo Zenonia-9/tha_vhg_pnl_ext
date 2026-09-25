@@ -64,7 +64,11 @@
 
     <template id="summary_pdf_body">
         <t t-foreach="lines" t-as="line">
-            <tr t-att-class="'o_fw_bold' if line.get('level') == 0 else ''">
+            <t t-set="is_highlight" t-value="'o_vhg_summary_highlight' in (line.get('class') or '')"/>
+            <tr
+                t-att-class="('o_fw_bold ' if line.get('level') == 0 else '') + ('o_vhg_summary_highlight' if is_highlight else '')"
+                t-att-style="'background-color: #FBE4D5; color: #C65911; font-weight: 700;' if is_highlight else None"
+            >
                 <t t-if="options.get('vhg_summary_horizontal_mode')">
                     <t t-set="cell" t-value="line['columns'][0]"/>
                     <td class="o_cell_td"><t t-call="account_reports.pdf_export_cell"/></td>

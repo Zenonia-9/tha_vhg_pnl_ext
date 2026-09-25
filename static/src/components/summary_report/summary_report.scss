@@ -71,6 +71,14 @@
         height: 1rem;
         padding: 0 !important;
     }
+
+    // Peach highlight from the 24 Sep 2026 workbook swatch
+    // (Excel Orange Accent 2, Lighter 80%).
+    tr.o_vhg_summary_highlight td {
+        background-color: #FBE4D5 !important;
+        color: #C65911 !important;
+        font-weight: 700;
+    }
 }
 
 .o_action.account_report.o_vhg_pnl_notes {
