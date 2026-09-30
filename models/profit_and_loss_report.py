@@ -1011,11 +1011,14 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         }
 
     def _total_line(self, report, options, key, name, balances, group_balances):
+        css_class = "fw-bold"
+        if key in ("ebitda", "earnings_after_tax"):
+            css_class += " o_vhg_summary_highlight"
         return {
             "id": report._get_generic_line_id(None, None, markup=f"vhg_pnl_{key}"),
             "name": name,
             "level": 0,
-            "class": "fw-bold",
+            "class": css_class,
             "columns": self._columns(
                 report, options, balances, group_key=key,
                 group_balances=group_balances,
