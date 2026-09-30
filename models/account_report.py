@@ -40,6 +40,8 @@ class AccountReport(models.Model):
             "tha_vhg_pnl_ext.report_vhg_profit_and_loss", raise_if_not_found=False
         )
         if self == notes_report and options.get("vhg_notes_native_xlsx"):
+            if options.get("hide_0_lines"):
+                lines = self._filter_out_0_lines(lines)
             for line in lines:
                 if line.get("level") == 1 and line.get("unfoldable"):
                     line["columns"] = [
@@ -87,6 +89,8 @@ class AccountReport(models.Model):
 
         print_options = self.get_options({**options, "export_mode": "file"})
         lines = self._get_lines(print_options)
+        if self == summary_report and print_options.get("hide_0_lines"):
+            lines = self._filter_out_0_lines(lines)
         header = workbook.add_format({
             "bold": True, "border": 1, "border_color": "#B4C7E7",
             "align": "center", "valign": "vcenter", "font_color": "#FFFFFF",
