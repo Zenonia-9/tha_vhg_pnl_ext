@@ -417,9 +417,11 @@ class VhgProfitAndLossSummaryReportHandler(models.AbstractModel):
             return column_dict
 
         column_dict["name"] = formatted_value
+        # Keep numeric metadata so Odoo's native Hide lines at 0 filter can
+        # distinguish real zero rows from summary rows with actual values.
+        column_dict["is_zero"] = value is None or value == 0
         if options.get("export_mode") != "file":
             column_dict.update({
-                "figure_type": "string",
                 "no_format": formatted_value if value is not None else None,
             })
         return column_dict

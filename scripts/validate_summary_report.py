@@ -56,6 +56,19 @@ assert highlight_names == {"EBITDA", "Earnings After Tax"}, highlight_names
 assert len(no_budget_lines) == 27, len(no_budget_lines)
 assert all(not line.get("unfoldable") for line in no_budget_lines)
 assert all(not line.get("expand_function") for line in no_budget_lines)
+
+hide_zero_options = report.get_options({
+    **base_previous,
+    "hide_0_lines": True,
+    "export_mode": "print",
+})
+hide_zero_lines = report._get_lines(hide_zero_options)
+assert any(line["name"] == "Inpatients" for line in hide_zero_lines), (
+    "Hide lines at 0 incorrectly removed non-zero Summary lines"
+)
+inpatient = next(line for line in hide_zero_lines if line["name"] == "Inpatients")
+assert inpatient["columns"][0]["figure_type"] == "monetary"
+assert inpatient["columns"][0]["is_zero"] is False
 number_cells = [line["columns"][6]["no_format"] for line in no_budget_lines]
 assert [number for number in number_cells if number] == [
     *[str(number) for number in range(1, 15)],
