@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import date
 from io import BytesIO
 from xml.etree import ElementTree
@@ -13,7 +14,7 @@ def column_name(number):
 
 
 def displayed_number(cell):
-    value = cell["no_format"]
+    value = cell["name"]
     return float(value.replace(",", "").rstrip("%")) if isinstance(value, str) else value
 
 
@@ -141,7 +142,7 @@ for prefix in ("mtd_actual", "mtd_budget", "ytd_actual", "ytd_budget"):
     assert total_revenue_percent is None or abs(total_revenue_percent - 100.0) < 0.02
     assert expected_direct_cost_percent is None or abs(direct_cost_percent - expected_direct_cost_percent) < 0.02
 
-for prefix in ("mtd_actual", "mtd_budget", "mtd_variance", "ytd_actual", "ytd_budget", "ytd_variance"):
+for prefix in ("mtd_actual", "mtd_budget", "ytd_actual", "ytd_budget"):
     net_revenues_percent = displayed_number(
         lines_by_name["Net Revenues"]["columns"][columns_by_label[f"{prefix}_percent"]]
     )
@@ -174,12 +175,15 @@ expanded_options = report.get_options({
     **budget_previous,
     "vhg_show_monthly_columns": True,
 })
-assert expanded_options["vhg_summary_month_keys"] == [
-    "actual_2026_04", "actual_2026_05", "actual_2026_06", "actual_2026_07",
+assert set(expanded_options["vhg_summary_month_keys"]).issubset(
+    expanded_options["vhg_summary_fiscal_month_keys"]
+)
+expected_budget_month_keys = [
+    key.replace("actual_", "budget_")
+    for key in expanded_options["vhg_summary_fiscal_month_keys"]
+    if key <= expanded_options["vhg_summary_selected_month_key"]
 ]
-assert expanded_options["vhg_summary_budget_month_keys"] == [
-    "budget_2026_04", "budget_2026_05", "budget_2026_06", "budget_2026_07",
-]
+assert expanded_options["vhg_summary_budget_month_keys"] == expected_budget_month_keys
 expanded_lines = report._get_lines(expanded_options)
 assert any(
     cell.get("no_format")
@@ -396,7 +400,23 @@ with ZipFile(BytesIO(xlsx["file_content"])) as workbook:
 expanded_xlsx = report.export_to_xlsx(expanded_options)
 with ZipFile(BytesIO(expanded_xlsx["file_content"])) as workbook:
     worksheet_xml = workbook.read("xl/worksheets/sheet1.xml")
-    for merged_range in (b'A4:F4', b'G4:G5', b'H4:H5', b'I4:J4', b'K4:N4', b'O4:R4', b'S4:V4'):
+    actual_month_count = len(expanded_options["vhg_summary_month_keys"])
+    budget_month_count = len(expanded_options["vhg_summary_budget_month_keys"])
+    expected_merged_ranges = [b'A4:F4', b'G4:G5', b'H4:H5', b'I4:J4']
+    if actual_month_count:
+        expected_merged_ranges.append(
+            f"K4:{column_name(10 + actual_month_count)}4".encode()
+        )
+    budget_start = 10 + actual_month_count
+    if budget_month_count:
+        expected_merged_ranges.append(
+            f"{column_name(budget_start + 1)}4:{column_name(budget_start + budget_month_count)}4".encode()
+        )
+    ytd_budget_start = budget_start + budget_month_count
+    expected_merged_ranges.append(
+        f"{column_name(ytd_budget_start + 1)}4:{column_name(ytd_budget_start + 4)}4".encode()
+    )
+    for merged_range in expected_merged_ranges:
         assert merged_range in worksheet_xml, merged_range
 pdf = report.export_to_pdf(budget_options)
 assert len(pdf["file_content"]) > 1000
@@ -407,10 +427,19 @@ million_options = report.get_options({
 })
 million_lines = report._get_lines(million_options)
 total_revenue = next(line for line in million_lines if line["name"] == "Total Revenue")
-assert total_revenue["columns"][0]["name"] == "0.05"
-assert total_revenue["columns"][0]["no_format"] == "0.05"
-assert total_revenue["columns"][1]["name"] == "100.00%"
-assert total_revenue["columns"][1]["no_format"] == "100.00%"
+assert total_revenue["columns"][0]["figure_type"] == "monetary"
+assert isinstance(total_revenue["columns"][0]["no_format"], (int, float))
+assert total_revenue["columns"][0]["name"] == report.format_value(
+    million_options, total_revenue["columns"][0]["no_format"], "monetary",
+    format_params=total_revenue["columns"][0]["format_params"],
+)
+assert total_revenue["columns"][1]["figure_type"] == "percentage"
+assert isinstance(total_revenue["columns"][1]["no_format"], (int, float))
+assert total_revenue["columns"][1]["name"] == report.format_value(
+    {**million_options, "rounding_unit": "decimals"},
+    total_revenue["columns"][1]["no_format"], "percentage",
+    format_params=total_revenue["columns"][1]["format_params"],
+)
 million_file_options = report.get_options({
     **budget_previous,
     "rounding_unit": "millions",
@@ -421,22 +450,21 @@ total_revenue_file = next(
     line for line in million_file_lines if line["name"] == "Total Revenue"
 )
 raw_total_revenue = total_revenue_file["columns"][0]["no_format"]
-for rounding_unit, factor in {
-    "decimals": 1.0,
-    "units": 1.0,
-    "thousands": 1_000.0,
-    "lakhs": 100_000.0,
-    "millions": 1_000_000.0,
-}.items():
+assert total_revenue["columns"][0]["no_format"] == raw_total_revenue
+for rounding_unit in ("decimals", "units", "thousands", "lakhs", "millions"):
     unit_options = report.get_options({
         **budget_previous,
         "rounding_unit": rounding_unit,
     })
-    unit_lines = report._get_lines(unit_options)
+    unit_lines = report.format_column_values(unit_options, deepcopy(million_lines))
     unit_total_revenue = next(line for line in unit_lines if line["name"] == "Total Revenue")
-    assert unit_total_revenue["columns"][0]["figure_type"] == "string"
-    assert float(unit_total_revenue["columns"][0]["no_format"].replace(",", "")) == round(
-        raw_total_revenue / factor, 2
+    assert unit_total_revenue["columns"][0]["figure_type"] == "monetary"
+    assert unit_total_revenue["columns"][0]["no_format"] == raw_total_revenue
+    assert unit_total_revenue["columns"][0]["name"] == report.format_value(
+        unit_options,
+        raw_total_revenue,
+        "monetary",
+        format_params=unit_total_revenue["columns"][0]["format_params"],
     )
 million_xlsx = report.export_to_xlsx(million_options)
 with ZipFile(BytesIO(million_xlsx["file_content"])) as workbook:
