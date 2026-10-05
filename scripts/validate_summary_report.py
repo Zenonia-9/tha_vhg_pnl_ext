@@ -69,6 +69,15 @@ assert any(line["name"] == "Inpatients" for line in hide_zero_lines), (
 inpatient = next(line for line in hide_zero_lines if line["name"] == "Inpatients")
 assert inpatient["columns"][0]["figure_type"] == "monetary"
 assert inpatient["columns"][0]["is_zero"] is False
+zero_line = {"id": "zero-detail", "columns": [{"figure_type": "monetary", "is_zero": True}]}
+zero_total = {
+    "id": "zero-total",
+    "class": "fw-bold",
+    "columns": [{"figure_type": "monetary", "is_zero": True}],
+}
+assert [line["id"] for line in report._filter_out_0_lines([zero_line, zero_total])] == [
+    "zero-total"
+]
 number_cells = [line["columns"][6]["no_format"] for line in no_budget_lines]
 assert [number for number in number_cells if number] == [
     *[str(number) for number in range(1, 15)],

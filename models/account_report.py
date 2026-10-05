@@ -6,6 +6,29 @@ from odoo import models
 class AccountReport(models.Model):
     _inherit = "account.report"
 
+    def _filter_out_0_lines(self, lines):
+        """Hide zero detail rows without removing P&L total rows."""
+        notes_report = self.env.ref(
+            "tha_vhg_pnl_ext.report_vhg_profit_and_loss", raise_if_not_found=False
+        )
+        summary_report = self.env.ref(
+            "tha_vhg_pnl_ext.report_vhg_profit_and_loss_summary", raise_if_not_found=False
+        )
+        if self not in (notes_report, summary_report):
+            return super()._filter_out_0_lines(lines)
+
+        total_ids = {
+            line["id"]
+            for line in lines
+            if "fw-bold" in (line.get("class") or "")
+            or "|total~~" in line.get("id", "")
+        }
+        visible_ids = {
+            line["id"] for line in super()._filter_out_0_lines(lines)
+        }
+        visible_ids.update(total_ids)
+        return [line for line in lines if line["id"] in visible_ids]
+
     def _report_custom_engine_vhg_pnl_reference(
         self, expressions, options, date_scope, current_groupby, next_groupby,
         offset=0, limit=None, warnings=None,
