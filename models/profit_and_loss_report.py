@@ -456,7 +456,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
         top_headers = []
         if has_previous_period_comparison:
-            total_colspan = 2 * (len([spec for spec in period_total_analytic_specs if spec]) + 1)
+            # Include every synthetic total column, including budget and variance.
+            total_colspan = len(columns) - len(native_columns) - len(actual_percent_column_groups)
             top_headers.append({"name": period_total_header, "colspan": total_colspan})
         for column in options["columns"]:
             forced_options = options["column_groups"][column["column_group_key"]]["forced_options"]
@@ -551,36 +552,6 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     {"name": header["name"], "colspan": header["colspan"], "rowspan": 1}
                     for header in analytic_headers
                 ])
-        elif has_selected_budget:
-            amount_headers = []
-            budget_amount_column_group_keys = set()
-            budget_percentage_column_group_keys = set()
-            for percentage_column_group_key, (
-                actual_column_group_key, budget_column_group_key,
-            ) in budget_percentage_column_groups.items():
-                if actual_column_group_key:
-                    budget_amount_column_group_keys.add(budget_column_group_key)
-                    budget_percentage_column_group_keys.add(percentage_column_group_key)
-            for column in options["columns"]:
-                column_group_key = column["column_group_key"]
-                if column_group_key == period_total_percent_column_group_key:
-                    amount_headers.append({"name": "", "colspan": 1})
-                elif column_group_key == period_total_column_group_key:
-                    amount_headers.append({"name": "Amount", "colspan": 3})
-                elif column_group_key in (
-                    period_total_budget_column_group_key,
-                    period_total_budget_percent_column_group_key,
-                ):
-                    continue
-                elif column_group_key in budget_actual_column_group_keys:
-                    amount_headers.append({"name": "Amount", "colspan": 3})
-                elif column_group_key in (
-                    budget_amount_column_group_keys | budget_percentage_column_group_keys
-                ):
-                    continue
-                else:
-                    amount_headers.append({"name": "", "colspan": 1})
-            header_rows.append(amount_headers)
 
         options["vhg_notes_header_rows"] = header_rows
         options["column_headers"] = [[
@@ -612,7 +583,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         if start_date == end_date:
             return f"{end_date:%b %Y} Total"
         if start_date.year == end_date.year:
-            return f"{start_date:%b} - {end_date:%b} Total"
+            return f"{start_date:%b}-{end_date:%b} Total"
         return f"{start_date:%b %Y} - {end_date:%b %Y}"
 
     def _query_group_balances(self, report, options, date_scope=None):
