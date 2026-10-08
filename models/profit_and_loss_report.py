@@ -553,6 +553,37 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
                     for header in analytic_headers
                 ])
 
+        elif has_selected_budget:
+            amount_headers = []
+            budget_amount_column_group_keys = set()
+            budget_percentage_column_group_keys = set()
+            for percentage_column_group_key, (
+                actual_column_group_key, budget_column_group_key,
+            ) in budget_percentage_column_groups.items():
+                if actual_column_group_key:
+                    budget_amount_column_group_keys.add(budget_column_group_key)
+                    budget_percentage_column_group_keys.add(percentage_column_group_key)
+            for column in options["columns"]:
+                column_group_key = column["column_group_key"]
+                if column_group_key == period_total_percent_column_group_key:
+                    amount_headers.append({"name": "", "colspan": 1})
+                elif column_group_key == period_total_column_group_key:
+                    amount_headers.append({"name": "Amount", "colspan": 3})
+                elif column_group_key in (
+                    period_total_budget_column_group_key,
+                    period_total_budget_percent_column_group_key,
+                ):
+                    continue
+                elif column_group_key in budget_actual_column_group_keys:
+                    amount_headers.append({"name": "Amount", "colspan": 3})
+                elif column_group_key in (
+                    budget_amount_column_group_keys | budget_percentage_column_group_keys
+                ):
+                    continue
+                else:
+                    amount_headers.append({"name": "", "colspan": 1})
+            header_rows.append(amount_headers)
+
         options["vhg_notes_header_rows"] = header_rows
         options["column_headers"] = [[
             {"name": header["name"], "colspan": header["colspan"]}
