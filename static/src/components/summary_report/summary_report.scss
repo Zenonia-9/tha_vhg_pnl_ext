@@ -22,7 +22,12 @@
     tr.o_vhg_summary_highlight td {
         background-color: #FBE4D5 !important;
         color: #C65911 !important;
-        font-weight: 700;
+        font-weight: 700 !important;
+    }
+
+    tr.o_vhg_summary_highlight td * {
+        color: #C65911 !important;
+        font-weight: 700 !important;
     }
 }
 
