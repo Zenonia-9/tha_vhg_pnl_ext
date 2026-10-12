@@ -77,7 +77,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "702130", "702140", "702150", "702160", "702170", "702180",
             "702190", "702200", "702210", "702220", "702230", "702240",
             "702250", "702280", "702290", "702300",
-            "702310", "702260", "702270",
+            "702310", "702260",
         )),
         # 703060 Get from Staff Cost
         ("repair_maintenance", "Repair & Maintenance", 1, (
@@ -96,9 +96,10 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "705130", "705140", "705150", "705160", "705170", "705180", "705185", "705111",
         )),
         ("interest_income", "Interest Income", -1, ("500750",)),
+        # 702270 Get from administrative
         ("finance_expenses", "Finance Expenses", 1, (
             "706010", "706020", "706030", "706040", "706050", "706060",
-            "706070", "706080",
+            "706070", "706080", "702270",
         )),
         ("income_tax", "Income Tax", 1, ("707010",)),
     )
