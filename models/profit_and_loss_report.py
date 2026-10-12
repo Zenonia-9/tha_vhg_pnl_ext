@@ -14,12 +14,13 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
 
     # Group order and account codes follow VTR PL Note (June 26), column F.
     _GROUPS = (
+        # 500185 other_hospital_revenue to outpatient
         ("outpatient", "Outpatient (Revenue)", -1, (
             "500020", "500030", "500060", "500125", "500130", "500085",
             "500145", "500070", "500190", "500010", "500015", "500025",
             "500065", "500035", "500040", "500075", "500080", "500090",
             "500105", "500110", "500120", "500140", "500155", "500186",
-            "500181", "500182", "500183", "500184", "500187",
+            "500181", "500182", "500183", "500184", "500187", "500185"
         )),
         ("eopd_day_care", "Other (EOPD, Day care)", -1, (
             "500050", "500055", "500146", "500045",
@@ -28,12 +29,14 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
             "500095", "500100", "500150", "500115", "500135",
             "500160", "500165", "500170", "500175", "500180",
         )),
+        # 600180 operating_cost to direct_cost
         ("direct_cost", "Direct Cost", 1, (
             "600010", "600020", "600030", "600035", "600040", "600045",
+            "600180",
         )),
         ("other_hospital_revenue", "Other Hospital Revenue (Partnership Income)", -1, (
             "510030", "510015", "510000", "510010", "510035",
-            "510020", "510025", "500185", "500400", "500405", "500410",
+            "510020", "510025", "500400", "500405", "500410",
             "500415", "500420", "500425", "500600", "510100", "510105",
             "510110", "510115", "510120",
         )),
@@ -54,7 +57,6 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         )),
         # 702316 Need to Remove
         ("operating_cost", "Operating Cost", 1, (
-            "600180",
             "700010", "700020", "700030", "700040", "700050", "700060",
             "700080", "700090", "700100", "700110", "700120", "700130",
             "700140", "700170", "700190", "700070", "700150",
@@ -85,7 +87,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         ("sales_marketing", "Sales & Marketing", 1, (
             "704020", "704030", "704040", "704050",
         )),
-        ("commission_expense", "Commission Expense", 1, ("704010",)),
+        # 704011 New
+        ("commission_expense", "Commission Expense", 1, ("704010", "704011")),
         ("taxes", "Taxes", 1, ("707020", "707030")),
         ("depreciation", "Depreciation & Amortization", 1, (
             "705010", "705020", "705030", "705040", "705050", "705060",
