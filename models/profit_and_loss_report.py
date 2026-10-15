@@ -31,7 +31,7 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         )),
         # 600180 operating_cost to direct_cost
         ("direct_cost", "Direct Cost", 1, (
-            "600010", "600020", "600030", "600035", "600040", "600045",
+            "600010", "600020", "600040", "600045",
             "600180",
         )),
         ("other_hospital_revenue", "Other Hospital Revenue (Partnership Income)", -1, (
@@ -87,8 +87,8 @@ class VhgProfitAndLossReportHandler(models.AbstractModel):
         ("sales_marketing", "Sales & Marketing", 1, (
             "704020", "704030", "704040", "704050",
         )),
-        # 704011 New
-        ("commission_expense", "Commission Expense", 1, ("704010", "704011")),
+        # 704011 New  "600030", "600035" From direct_cost
+        ("commission_expense", "Commission Expense", 1, ("704010", "704011", "600030", "600035",)),
         ("taxes", "Taxes", 1, ("707020", "707030")),
         ("depreciation", "Depreciation & Amortization", 1, (
             "705010", "705020", "705030", "705040", "705050", "705060",
