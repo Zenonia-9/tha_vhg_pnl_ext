@@ -7,7 +7,7 @@ class AccountReport(models.Model):
     _inherit = "account.report"
 
     def _filter_out_0_lines(self, lines):
-        """Hide zero detail rows without removing P&L total rows."""
+        """Hide zero details and section headers while retaining P&L totals."""
         notes_report = self.env.ref(
             "tha_vhg_pnl_ext.report_vhg_profit_and_loss", raise_if_not_found=False
         )
@@ -20,7 +20,7 @@ class AccountReport(models.Model):
         total_ids = {
             line["id"]
             for line in lines
-            if "fw-bold" in (line.get("class") or "")
+            if (line.get("level") == 0 and "fw-bold" in (line.get("class") or ""))
             or "|total~~" in line.get("id", "")
         }
         visible_ids = {
