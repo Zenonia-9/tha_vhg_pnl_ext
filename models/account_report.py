@@ -111,6 +111,10 @@ class AccountReport(models.Model):
             return super()._inject_report_into_xlsx_sheet(options, workbook, sheet)
 
         print_options = self.get_options({**options, "export_mode": "file"})
+        # export_to_xlsx rebuilds options for each sheet; retain the user's
+        # selected value explicitly across that rebuild for both custom P&L exports.
+        if "hide_0_lines" in options:
+            print_options["hide_0_lines"] = options["hide_0_lines"]
         lines = self._get_lines(print_options)
         if self == summary_report and print_options.get("hide_0_lines"):
             lines = self._filter_out_0_lines(lines)
