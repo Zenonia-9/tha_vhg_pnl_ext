@@ -7,7 +7,7 @@ class AccountReport(models.Model):
     _inherit = "account.report"
 
     def _filter_out_0_lines(self, lines):
-        """Hide zero details and section headers while retaining P&L totals."""
+        """Keep report totals and subtotals belonging to visible sections."""
         notes_report = self.env.ref(
             "tha_vhg_pnl_ext.report_vhg_profit_and_loss", raise_if_not_found=False
         )
@@ -17,14 +17,17 @@ class AccountReport(models.Model):
         if self not in (notes_report, summary_report):
             return super()._filter_out_0_lines(lines)
 
+        visible_ids = {
+            line["id"] for line in super()._filter_out_0_lines(lines)
+        }
         total_ids = {
             line["id"]
             for line in lines
             if (line.get("level") == 0 and "fw-bold" in (line.get("class") or ""))
-            or "|total~~" in line.get("id", "")
-        }
-        visible_ids = {
-            line["id"] for line in super()._filter_out_0_lines(lines)
+            or (
+                "|total~~" in line.get("id", "")
+                and line.get("parent_id") in visible_ids
+            )
         }
         visible_ids.update(total_ids)
         return [line for line in lines if line["id"] in visible_ids]
